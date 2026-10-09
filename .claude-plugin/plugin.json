@@ -1,0 +1,6 @@
+{
+  "name": "mango",
+  "version": "0.1.0",
+  "description": "A fluffy black cat above the prompt, in memory of Mango.",
+  "types": "./types/index.d.ts"
+}
