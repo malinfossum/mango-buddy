@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
+import type { TestBody } from 'claude-code/testing'
 import { TICK_MS, SLEEP_AFTER_TICKS } from './cat'
 
 export const SURFACES = ['terminal', 'desktop'] as const
@@ -197,4 +198,110 @@ test('submitting a prompt clears the remark', async ($, on) => {
   expect((await ui.find({ key: 'line' }))?.text).toMatch(/^Mango/)
   await $.prompt.submit({ text: 'hi' })
   expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+})
+
+// Nothing beneath the plugin answers session.start or command.register, so tests that start a session do.
+const answerStart = (on: Parameters<Parameters<typeof test>[1]>[1]) => {
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('command.register', () => ({ value: { command: 'mango' } }))
+}
+
+// The kit's `$.command.run` stamps the origin and presentation itself.
+const run = ($: Parameters<TestBody>[0], args: string) => $.command.run({ command: 'mango', args })
+
+test('/mango pet purrs and counts, with sloppy input', async ($, on) => {
+  mock.clock(on)
+  const data = memoryStore(on, { pets: 2 })
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect((await run($, '  PET ')).text).toBe('Mango purrs.')
+  expect(data.get('pets')).toBe(3)
+  expect((await ui.find({ key: 'line' }))?.text).toMatch(/^Mango/)
+  expect((await run($, '')).text).toBe('Mango purrs.')
+  expect(data.get('pets')).toBe(4)
+})
+
+test('/mango off hides the band and on brings it back, and the flag persists', async ($, on) => {
+  mock.clock(on)
+  const data = memoryStore(on)
+  answerStart(on)
+  // What the engine draws for the band when Mango steps aside: nothing.
+  on('ui.render', () => ({ type: 'Box' }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  expect((await run($, 'off')).text).toBe('Mango is away.')
+  expect(await ui.find({ key: 'row1' })).toBeUndefined()
+  expect(data.get('isOff')).toBe(true)
+  expect((await run($, 'on')).text).toBe('Mango is back.')
+  expect(await ui.find({ key: 'row1' })).toBeDefined()
+  expect(data.get('isOff')).toBe(false)
+})
+
+test('/mango mute keeps the cat and drops the speech line', async ($, on) => {
+  mock.clock(on)
+  const data = memoryStore(on)
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect((await run($, 'mute')).text).toBe('Mango is quiet now.')
+  expect(data.get('isMuted')).toBe(true)
+  expect(await ui.find({ key: 'row2' })).toBeDefined()
+  expect(await ui.find({ key: 'line' })).toBeUndefined()
+  expect((await run($, 'unmute')).text).toBe('Mango may speak again.')
+  expect(await ui.find({ key: 'line' })).toBeDefined()
+})
+
+test('/mango still and move toggle the flag', async ($, on) => {
+  mock.clock(on)
+  const data = memoryStore(on)
+  answerStart(on)
+  await $.session.start(START)
+  expect((await run($, 'still')).text).toBe('Mango sits still.')
+  expect(data.get('isStill')).toBe(true)
+  expect((await run($, 'move')).text).toBe('Mango moves again.')
+  expect(data.get('isStill')).toBe(false)
+})
+
+test('stored flags load at session start, and anything but true counts as false', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on, { isMuted: true, isOff: 'yes' })
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect(await ui.find({ key: 'row1' })).toBeDefined()
+  expect(await ui.find({ key: 'line' })).toBeUndefined()
+})
+
+test('/mango card reports stats; unknown words get help', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on, { sessions: 4, pets: 9, errorsSurvived: 3 })
+  answerStart(on)
+  on('turn.complete', (_$, e) => ({ text: e.answer }))
+  on('session.usage', () => ({ value: usageAt(12) }))
+  await $.session.start(START)
+  await $.turn.complete(TURN)
+  expect((await run($, 'card')).text).toBe('Mango · sessions 5 · pets 9 · errors survived 3 · context 12 %')
+  expect((await run($, 'dance')).text).toContain('pet')
+})
+
+test('session.start counts a session once, even when it runs twice', async ($, on) => {
+  mock.clock(on)
+  const data = memoryStore(on, { sessions: 1 })
+  answerStart(on)
+  await $.session.start(START)
+  await $.session.start(START)
+  expect(data.get('sessions')).toBe(2)
+})
+
+test('a second session.start does not double the clock', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  await $.session.start(START)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  // One clock reaches tick 100 and Mango is awake; two clocks would reach tick 200 and she would sleep.
+  await clock.advance(TICK_MS * (SLEEP_AFTER_TICKS - 60))
+  expect((await ui.find({ key: 'row2' }))?.text).not.toMatch(/z/)
 })

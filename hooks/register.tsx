@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, Timer } from 'claude-code'
 import type { Mood } from '../types'
 import { BUDGET_PERCENT, frameFor, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS } from './cat'
 
@@ -23,6 +23,9 @@ const flag = (x: unknown): boolean => x === true
 // change, so time is kept here and the atom follows it.
 let clockTick = 0
 
+// The running clock, kept so a repeated session.start stops it before starting another.
+let clock: Timer | undefined
+
 const snapshot = async ($: EngineType, t: number) => ({
   mood: await read($, mood),
   moodUntil: await read($, moodUntil),
@@ -43,6 +46,49 @@ const bump = async ($: EngineType, key: string): Promise<number> => {
   return value
 }
 
+const HELP = 'Mango knows: pet, mute, unmute, still, move, off, on, card.'
+
+export const runCommand = async ($: EngineType, args: string): Promise<string> => {
+  const word = args.trim().toLowerCase().split(/\s+/)[0] ?? ''
+  switch (word) {
+    case '':
+    case 'pet':
+      await bump($, 'pets')
+      await update($, remark, () => remarkFor('purr', clockTick))
+      return 'Mango purrs.'
+    case 'mute':
+      await update($, isMuted, () => true)
+      await $.store.set('isMuted', true)
+      return 'Mango is quiet now.'
+    case 'unmute':
+      await update($, isMuted, () => false)
+      await $.store.set('isMuted', false)
+      return 'Mango may speak again.'
+    case 'still':
+      await update($, isStill, () => true)
+      await $.store.set('isStill', true)
+      return 'Mango sits still.'
+    case 'move':
+      await update($, isStill, () => false)
+      await $.store.set('isStill', false)
+      return 'Mango moves again.'
+    case 'off':
+      await update($, isOff, () => true)
+      await $.store.set('isOff', true)
+      return 'Mango is away.'
+    case 'on':
+      await update($, isOff, () => false)
+      await $.store.set('isOff', false)
+      return 'Mango is back.'
+    case 'card': {
+      const n = async (k: string) => Number(await $.store.get(k)) || 0
+      return `Mango · sessions ${await n('sessions')} · pets ${await n('pets')} · errors survived ${await n('errorsSurvived')} · context ${await read($, contextPercent)} %`
+    }
+    default:
+      return HELP
+  }
+}
+
 const setTimedMood = async ($: EngineType, m: 'ruffled' | 'proud', ticks: number) => {
   const t = clockTick
   await update($, mood, () => m)
@@ -60,7 +106,8 @@ export const register: Register = on => {
     await update($, isStill, () => storedStill)
     clockTick = await read($, tick)
 
-    $.clock.every(TICK_MS, async () => {
+    clock?.cancel()
+    clock = $.clock.every(TICK_MS, async () => {
       clockTick += 1
       const t = clockTick
       if (!(await read($, isStill))) {
@@ -71,8 +118,21 @@ export const register: Register = on => {
       const s = await snapshot($, t)
       if (resolveMood(s) !== resolveMood({ ...s, tick: stored })) await update($, tick, () => t)
     })
+
+    if (!(await read($, isSessionCounted))) {
+      await bump($, 'sessions')
+      await update($, isSessionCounted, () => true)
+    }
+    await $.command.register({
+      name: 'mango',
+      description: 'Pet Mango, or tell her to be still, quiet or away.',
+      argumentHint: 'pet | mute | unmute | still | move | off | on | card',
+    })
     return next(e)
   }).catch(($, e, next) => next(e))
+
+  on('command.run', { command: 'mango' }, async ($, e) => ({ text: await runCommand($, e.args) }))
+    .catch(($, e, next) => (next.called ? next(e) : { text: HELP }))
 
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     await markActivity($)
@@ -128,6 +188,7 @@ export const register: Register = on => {
     const t = await read($, tick)
     const s = await snapshot($, t)
     const said = await read($, remark)
+    const muted = await read($, isMuted)
     const pose = e.props.isWorking ? 'working' : resolveMood(s)
     const [row1, row2] = frameFor(pose, t)
     return (
@@ -135,8 +196,10 @@ export const register: Register = on => {
         <Box key="row1"><Text>{row1}</Text></Box>
         <Box>
           <Box key="row2"><Text>{row2}</Text></Box>
-          <Text>{'  '}</Text>
-          <Box key="line"><Text dimColor={said === null}>{said ?? `context ${s.contextPercent} %`}</Text></Box>
+          {muted ? null : <Text>{'  '}</Text>}
+          {muted ? null : (
+            <Box key="line"><Text dimColor={said === null}>{said ?? `context ${s.contextPercent} %`}</Text></Box>
+          )}
         </Box>
       </Box>
     )
