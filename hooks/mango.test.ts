@@ -126,3 +126,75 @@ test('the Bash hook throwing after next still returns the result once', async ($
   expect(ran.isError).toBe(true)
   expect(runs).toBe(1)
 })
+
+const usageAt = (percent: number | undefined, window = 200000) => ({
+  startedAt: 0,
+  context: { window, tokens: percent === undefined ? undefined : (percent / 100) * window, percent },
+  rateLimits: [],
+})
+
+const TURN = { answer: '', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer' as const }
+
+test('crossing 20 % worries Mango and toasts once; dropping below calms her', async ($, on) => {
+  mock.clock(on)
+  mock.store(on)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('turn.complete', (_$, e) => ({ text: e.answer }))
+  let percent = 25
+  const toasts: string[] = []
+  on('session.usage', () => ({ value: usageAt(percent) }))
+  on('ui.toast', (_, e) => { toasts.push(e.text); return { value: undefined } })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  await $.turn.complete(TURN)
+  expect((await ui.find({ key: 'row2' }))?.text).toContain('O.O')
+  await $.turn.complete({ ...TURN, turnId: 't2' })
+  expect(toasts).toHaveLength(1)
+  percent = 10
+  await $.turn.complete({ ...TURN, turnId: 't3' })
+  expect((await ui.find({ key: 'row2' }))?.text).not.toContain('O.O')
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 10 %')
+})
+
+test('percent absent and window 0 leaves the previous value', async ($, on) => {
+  mock.clock(on)
+  mock.store(on)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('turn.complete', (_$, e) => ({ text: e.answer }))
+  let usage = usageAt(15)
+  on('session.usage', () => ({ value: usage }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  await $.turn.complete(TURN)
+  usage = usageAt(undefined, 0)
+  await $.turn.complete({ ...TURN, turnId: 't2' })
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 15 %')
+})
+
+test('a long turn gets a yawn, an aborted long turn does not', async ($, on) => {
+  mock.clock(on)
+  mock.store(on)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('turn.complete', (_$, e) => ({ text: e.answer }))
+  on('session.usage', () => ({ value: usageAt(5) }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  await $.turn.complete({ ...TURN, durationMs: 130000, isAborted: true, reason: 'aborted' })
+  expect((await ui.find({ key: 'line' }))?.text).not.toMatch(/^Mango/)
+  await $.turn.complete({ ...TURN, turnId: 't2', durationMs: 130000 })
+  expect((await ui.find({ key: 'line' }))?.text).toMatch(/^Mango/)
+})
+
+test('submitting a prompt clears the remark', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: 'boom' }, isError: true }))
+  on('prompt.submit', (_$, e) => e)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'u8' })
+  expect((await ui.find({ key: 'line' }))?.text).toMatch(/^Mango/)
+  await $.prompt.submit({ text: 'hi' })
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+})

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 import type { Mood } from '../types'
-import { frameFor, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS } from './cat'
+import { BUDGET_PERCENT, frameFor, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS } from './cat'
 
 type EngineType = EngineInterface
 
@@ -86,6 +86,40 @@ export const register: Register = on => {
       await setTimedMood($, 'proud', PROUD_TICKS)
     }
     return ran
+  }).catch(($, e, next) => next(e))
+
+  on('turn.complete', async ($, e, next) => {
+    await markActivity($)
+    try {
+      const { context } = await $.session.usage()
+      const percent =
+        context.percent ??
+        (context.window > 0 && context.tokens !== undefined ? (context.tokens / context.window) * 100 : undefined)
+      if (percent !== undefined) {
+        const rounded = Math.round(percent)
+        await update($, contextPercent, () => rounded)
+        const over = rounded >= BUDGET_PERCENT
+        const was = await read($, wasOverBudget)
+        if (over && !was) {
+          await $.ui.toast(`Mango: context passed ${BUDGET_PERCENT} %`)
+          await update($, remark, () => remarkFor('worried', clockTick))
+        }
+        if (!over && was) await update($, remark, () => null)
+        await update($, wasOverBudget, () => over)
+      }
+    } catch {
+      // usage unavailable: keep the previous figure
+    }
+    if (!e.isAborted && e.durationMs > 120000) {
+      await update($, remark, () => remarkFor('yawn', clockTick))
+    }
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('prompt.submit', async ($, e, next) => {
+    await markActivity($)
+    await update($, remark, () => null)
+    return next(e)
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
