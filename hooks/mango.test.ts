@@ -208,7 +208,7 @@ const answerStart = (on: On) => {
 }
 
 // The kit's typed `$.command.run` takes the full input, so the origin and presentation are given.
-const run = ($: Parameters<TestBody>[0], args: string) => $.command.run({ command: 'mango', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })
+const run = ($: Parameters<TestBody>[0], args: string) => $.command.run({ command: 'mango', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: BAND.bodyColumns } })
 
 test('/mango pet purrs and counts, with sloppy input', async ($, on) => {
   mock.clock(on)
