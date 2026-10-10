@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 import type { Mood } from '../types'
-import { frameFor, resolveMood, TICK_MS } from './cat'
+import { frameFor, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS } from './cat'
 
 type EngineType = EngineInterface
 
@@ -36,6 +36,20 @@ export const markActivity = async ($: EngineType) => {
   await update($, lastActivityTick, () => t)
 }
 
+// Reads the count, adds one and writes it back at the moment of change.
+const bump = async ($: EngineType, key: string): Promise<number> => {
+  const value = (Number(await $.store.get(key)) || 0) + 1
+  await $.store.set(key, value)
+  return value
+}
+
+const setTimedMood = async ($: EngineType, m: 'ruffled' | 'proud', ticks: number) => {
+  const t = clockTick
+  await update($, mood, () => m)
+  await update($, moodUntil, () => t + ticks)
+  await update($, remark, () => remarkFor(m, t))
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const storedOff = flag(await $.store.get('isOff'))
@@ -62,7 +76,16 @@ export const register: Register = on => {
 
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     await markActivity($)
-    return next(e)
+    const isTest = isTestCommand(e.command)
+    const ran = await next(e)
+    if (ran.deny !== undefined) return ran
+    if (ran.isError === true) {
+      await setTimedMood($, 'ruffled', RUFFLED_TICKS)
+      await bump($, 'errorsSurvived')
+    } else if (isTest) {
+      await setTimedMood($, 'proud', PROUD_TICKS)
+    }
+    return ran
   }).catch(($, e, next) => next(e))
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
@@ -70,6 +93,7 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const t = await read($, tick)
     const s = await snapshot($, t)
+    const said = await read($, remark)
     const pose = e.props.isWorking ? 'working' : resolveMood(s)
     const [row1, row2] = frameFor(pose, t)
     return (
@@ -78,7 +102,7 @@ export const register: Register = on => {
         <Box>
           <Box key="row2"><Text>{row2}</Text></Box>
           <Text>{'  '}</Text>
-          <Box key="line"><Text dimColor>{`context ${s.contextPercent} %`}</Text></Box>
+          <Box key="line"><Text dimColor={said === null}>{said ?? `context ${s.contextPercent} %`}</Text></Box>
         </Box>
       </Box>
     )
