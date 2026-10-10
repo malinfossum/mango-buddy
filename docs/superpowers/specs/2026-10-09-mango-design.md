@@ -70,7 +70,7 @@ Test regex, applied to the trimmed Bash command: `/\b(npm|pnpm|yarn|bun)\s+(run\
 - `prompt.submit`: mark activity, clear the remark, then `next(e)` unchanged.
 - `tool.call` with `{ tool: 'Bash' }`: `await next(e)`; on `isError` set ruffled, bump `errorsSurvived`, pick a ruffled remark; on a test command without error set proud with a proud remark. Never deny or rewrite.
 - `turn.complete`: mark activity; read `$.session.usage()`; store `context.percent` (fall back to `tokens / window * 100` when `percent` is absent and `window > 0`, else leave the previous value); if `wasOverBudget` flips from false to true, `$.ui.toast('Mango: context passed 20 %')` and set worried; if `durationMs > 120000`, remark a yawn line.
-- `ui.render` on `AbovePrompt`: described above, with two size guards. When `e.props.maxRows < 3` draw one row: the face `(-.-)` and the speech line. The speech line is truncated to `e.props.bodyColumns - 9` characters (7 columns of art plus a 2 column gap) so it never wraps.
+- `ui.render` on `AbovePrompt`: described above, with two size guards. When `e.props.maxRows < 3` draw one row: the face `(-.-)` and the speech line. The speech line is cut to `e.props.bodyColumns - 12` characters (ten columns of art plus a two column gap), or `e.props.bodyColumns - 7` in the one-row form (five columns of face plus the gap), so it never wraps. A band narrower than the art draws the art with an empty line.
 - `command.run` with `{ command: 'mango' }`: dispatch on the first word of `e.args`.
 
 ## Command

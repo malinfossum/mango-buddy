@@ -316,3 +316,46 @@ test('a failed store write is reported plainly and the live flag does not flip',
   expect((await run($, 'mute')).text).toBe('Mango could not do that.')
   expect(await ui.find({ key: 'line' })).toBeDefined()
 })
+
+test('under three rows Mango is one row: face and line', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: { ...BAND, maxRows: 2 } })
+  expect(await ui.find({ key: 'row1' })).toBeUndefined()
+  expect((await ui.find({ key: 'face' }))?.text).toMatch(/^\(.\..\)$/)
+  expect(await ui.find({ key: 'line' })).toBeDefined()
+})
+
+test('the speech line is cut to the columns left beside the art', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: { ...BAND, bodyColumns: 20 } })
+  await run($, 'pet')
+  const line = (await ui.find({ key: 'line' }))?.text ?? ''
+  expect(line).toBe('Mango pu')
+  expect(line.length).toBeLessThanOrEqual(20 - 12)
+})
+
+test('the one-row form cuts the line to bodyColumns minus seven', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: { ...BAND, maxRows: 2, bodyColumns: 15 } })
+  await run($, 'pet')
+  expect((await ui.find({ key: 'line' }))?.text).toBe('Mango pu')
+})
+
+test('a band narrower than the art draws the art and an empty line', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: { ...BAND, bodyColumns: 8 } })
+  expect(await ui.find({ key: 'row2' })).toBeDefined()
+  expect((await ui.find({ key: 'line' }))?.text ?? '').toBe('')
+})

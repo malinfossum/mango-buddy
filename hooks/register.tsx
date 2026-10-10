@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 import type { Mood } from '../types'
-import { BUDGET_PERCENT, frameFor, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS } from './cat'
+import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS } from './cat'
 
 type EngineType = EngineInterface
 
@@ -16,6 +16,8 @@ export const wasOverBudget = atom({ plugin: 'mango', key: 'wasOverBudget' } as c
 export const isOff = atom({ plugin: 'mango', key: 'isOff' } as const, false)
 export const isMuted = atom({ plugin: 'mango', key: 'isMuted' } as const, false)
 export const isStill = atom({ plugin: 'mango', key: 'isStill' } as const, false)
+
+const FACE_WIDTH = 5
 
 const flag = (x: unknown): boolean => x === true
 
@@ -190,16 +192,32 @@ export const register: Register = on => {
     const said = await read($, remark)
     const muted = await read($, isMuted)
     const pose = e.props.isWorking ? 'working' : resolveMood(s)
+    const isShort = e.props.maxRows < 3
+    // The face is 5 columns wide, the two-row art ART_WIDTH. A band narrower than
+    // the art draws the art with an empty line, never a negative slice.
+    const room = Math.max(0, e.props.bodyColumns - (isShort ? FACE_WIDTH : ART_WIDTH) - GAP)
+    const text = (said ?? `context ${s.contextPercent} %`).slice(0, room)
+    const speech = muted ? null : (
+      <>
+        <Text>{' '.repeat(GAP)}</Text>
+        <Box key="line"><Text dimColor={said === null}>{text}</Text></Box>
+      </>
+    )
+    if (isShort) {
+      return (
+        <Box>
+          <Box key="face"><Text>{faceFor(pose, t)}</Text></Box>
+          {speech}
+        </Box>
+      )
+    }
     const [row1, row2] = frameFor(pose, t)
     return (
       <Box flexDirection="column">
         <Box key="row1"><Text>{row1}</Text></Box>
         <Box>
           <Box key="row2"><Text>{row2}</Text></Box>
-          {muted ? null : <Text>{'  '}</Text>}
-          {muted ? null : (
-            <Box key="line"><Text dimColor={said === null}>{said ?? `context ${s.contextPercent} %`}</Text></Box>
-          )}
+          {speech}
         </Box>
       </Box>
     )
