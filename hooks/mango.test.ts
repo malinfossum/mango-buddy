@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
+import type { On } from 'claude-code'
 import { TICK_MS, SLEEP_AFTER_TICKS } from './cat'
 
 export const SURFACES = ['terminal', 'desktop'] as const
@@ -68,7 +69,7 @@ test('still mode stops tick writes but a mood change still redraws', async ($, o
 
 // The test's `$` has no `store` noun, so these tests answer the store ops with a Map
 // they can read back. A hook must answer a result object, so the value rides in { value }.
-const memoryStore = (on: Parameters<Parameters<typeof test>[1]>[1], entries: Record<string, unknown> = {}) => {
+const memoryStore = (on: On, entries: Record<string, unknown> = {}) => {
   const data = new Map<string, unknown>(Object.entries(entries))
   on('store.get', (_$, e) => ({ value: data.get(e.key) }))
   on('store.set', (_$, e) => { data.set(e.key, e.value); return { value: undefined } })
@@ -196,18 +197,18 @@ test('submitting a prompt clears the remark', async ($, on) => {
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
   await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'u8' })
   expect((await ui.find({ key: 'line' }))?.text).toMatch(/^Mango/)
-  await $.prompt.submit({ text: 'hi' })
+  await $.prompt.submit({ text: 'hi', wait: false, origin: { kind: 'composer' } })
   expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
 })
 
 // Nothing beneath the plugin answers session.start or command.register, so tests that start a session do.
-const answerStart = (on: Parameters<Parameters<typeof test>[1]>[1]) => {
+const answerStart = (on: On) => {
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('command.register', () => ({ value: { command: 'mango' } }))
 }
 
-// The kit's `$.command.run` stamps the origin and presentation itself.
-const run = ($: Parameters<TestBody>[0], args: string) => $.command.run({ command: 'mango', args })
+// The kit's typed `$.command.run` takes the full input, so the origin and presentation are given.
+const run = ($: Parameters<TestBody>[0], args: string) => $.command.run({ command: 'mango', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 80 } })
 
 test('/mango pet purrs and counts, with sloppy input', async ($, on) => {
   mock.clock(on)

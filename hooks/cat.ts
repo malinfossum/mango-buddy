@@ -63,7 +63,7 @@ const REMARKS: Record<Mood | 'purr' | 'yawn', readonly string[]> = {
 
 export const remarkFor = (mood: Mood | 'purr' | 'yawn', tick: number): string => {
   const lines = REMARKS[mood]
-  return lines[Math.abs(tick) % lines.length]
+  return lines[Math.abs(tick) % lines.length] ?? ''
 }
 
 const TEST_COMMAND = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\b(vitest|jest)\b|\bdotnet\s+test\b/
