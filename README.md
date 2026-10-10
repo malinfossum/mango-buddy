@@ -29,4 +29,6 @@ claude plugin validate .
 claude plugin test .
 ```
 
+The `.claude-plugin/types/` folder that `tsconfig.json` extends is laid by the engine after the first `claude plugin validate .` or load, so run that before `tsc`.
+
 Contributions are welcome and come in under this repo's MIT licence.
