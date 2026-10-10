@@ -1,0 +1,7 @@
+{
+  "name": "mango-buddy",
+  "owner": { "name": "Malin Fossum" },
+  "plugins": [
+    { "name": "mango", "source": "./", "description": "A fluffy black cat above the prompt, in memory of Mango." }
+  ]
+}
