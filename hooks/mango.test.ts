@@ -305,3 +305,14 @@ test('a second session.start does not double the clock', async ($, on) => {
   await clock.advance(TICK_MS * (SLEEP_AFTER_TICKS - 60))
   expect((await ui.find({ key: 'row2' }))?.text).not.toMatch(/z/)
 })
+
+test('a failed store write is reported plainly and the live flag does not flip', async ($, on) => {
+  mock.clock(on)
+  answerStart(on)
+  on('store.get', () => ({ value: undefined }))
+  on('store.set', () => { throw new Error('store down') })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect((await run($, 'mute')).text).toBe('Mango could not do that.')
+  expect(await ui.find({ key: 'line' })).toBeDefined()
+})

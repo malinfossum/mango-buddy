@@ -57,28 +57,28 @@ export const runCommand = async ($: EngineType, args: string): Promise<string> =
       await update($, remark, () => remarkFor('purr', clockTick))
       return 'Mango purrs.'
     case 'mute':
-      await update($, isMuted, () => true)
       await $.store.set('isMuted', true)
+      await update($, isMuted, () => true)
       return 'Mango is quiet now.'
     case 'unmute':
-      await update($, isMuted, () => false)
       await $.store.set('isMuted', false)
+      await update($, isMuted, () => false)
       return 'Mango may speak again.'
     case 'still':
-      await update($, isStill, () => true)
       await $.store.set('isStill', true)
+      await update($, isStill, () => true)
       return 'Mango sits still.'
     case 'move':
-      await update($, isStill, () => false)
       await $.store.set('isStill', false)
+      await update($, isStill, () => false)
       return 'Mango moves again.'
     case 'off':
-      await update($, isOff, () => true)
       await $.store.set('isOff', true)
+      await update($, isOff, () => true)
       return 'Mango is away.'
     case 'on':
-      await update($, isOff, () => false)
       await $.store.set('isOff', false)
+      await update($, isOff, () => false)
       return 'Mango is back.'
     case 'card': {
       const n = async (k: string) => Number(await $.store.get(k)) || 0
@@ -132,7 +132,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('command.run', { command: 'mango' }, async ($, e) => ({ text: await runCommand($, e.args) }))
-    .catch(($, e, next) => (next.called ? next(e) : { text: HELP }))
+    .catch(() => ({ text: 'Mango could not do that.' }))
 
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     await markActivity($)
