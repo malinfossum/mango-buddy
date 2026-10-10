@@ -62,7 +62,7 @@ Persistent values (`$.store`, JSON, survive restarts): `isOff`, `isMuted`, `isSt
 
 Priority when several apply: working is drawn whenever `isWorking` is true, regardless of mood. Otherwise ruffled and proud (timed) beat worried, and worried beats awake and sleeping.
 
-Test regex, applied to the trimmed Bash command: `/\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\b(vitest|jest)\b|\bdotnet\s+test\b/`.
+Test regex, applied to the trimmed Bash command and anchored to command position (the start of the line, or after `&&`, `;` or `|`, with optional `VAR=value` prefixes), so `npm install -D vitest` and `cat jest.config.js` do not count: `/(^|&&|;|\|)\s*(\w+=\S*\s+)*((npm|pnpm|yarn|bun)\s+(run\s+)?test|(npx\s+|pnpm\s+exec\s+)?(vitest|jest)|dotnet\s+test)\b/`.
 
 ## Hooks
 
@@ -103,7 +103,7 @@ Every hook carries a `.catch` that falls through to `next(e)` when the hook has 
 3. `turn.complete` with usage at 25 % sets worried and toasts once; a later turn at 10 % returns to awake with no second toast.
 4. 160 ticks without activity sleep; a prompt wakes.
 5. `/mango pet` increments `pets` and replies `Mango purrs.`; `/mango off` hides the band (render yields to `next`).
-6. The test regex rejects `npm install`, `echo test` and `ls` and accepts `npm test`, `pnpm run test`, `dotnet test`, `npx vitest`.
+6. The test regex rejects `npm install`, `echo test`, `ls`, `npm install -D vitest`, `cat jest.config.js` and `rm vitest.config.ts` and accepts `npm test`, `pnpm run test`, `dotnet test`, `npx vitest`.
 7. A Bash hook body that throws after `next` still returns the tool's result once (the `.catch` replays `next`), and the band still draws.
 8. `session.start` run twice in one session (a hot reload) increments `sessions` once.
 9. With `isStill` true, 20 ticks produce no atom write; a mood change produces one.

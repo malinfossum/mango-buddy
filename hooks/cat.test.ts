@@ -41,10 +41,10 @@ test('remarks rotate by tick and never repeat the same line twice in a row', () 
 })
 
 test('isTestCommand accepts test runners and rejects look-alikes', () => {
-  for (const c of ['npm test', 'pnpm run test', 'dotnet test', 'npx vitest', '  yarn test', 'cd web && npm test', 'bun test --watch']) {
+  for (const c of ['npm test', 'pnpm run test', 'dotnet test', 'npx vitest', '  yarn test', 'cd web && npm test', 'bun test --watch', 'CI=1 npm test', 'npx vitest run', 'cd x; jest']) {
     expect(isTestCommand(c), c).toBe(true)
   }
-  for (const c of ['npm install', 'echo test', 'ls', 'npm run build', 'git commit -m "test"', 'dotnet build']) {
+  for (const c of ['npm install', 'echo test', 'ls', 'npm run build', 'git commit -m "test"', 'dotnet build', 'npm install -D vitest', 'cat jest.config.js', 'rm vitest.config.ts']) {
     expect(isTestCommand(c), c).toBe(false)
   }
 })

@@ -66,7 +66,10 @@ export const remarkFor = (mood: Mood | 'purr' | 'yawn', tick: number): string =>
   return lines[Math.abs(tick) % lines.length] ?? ''
 }
 
-const TEST_COMMAND = /\b(npm|pnpm|yarn|bun)\s+(run\s+)?test\b|\b(vitest|jest)\b|\bdotnet\s+test\b/
+// A runner counts only at command position: the start of the line, or after &&, ; or |,
+// with optional VAR=value prefixes. So `npm install -D vitest` and `cat jest.config.js` do not.
+const TEST_COMMAND =
+  /(^|&&|;|\|)\s*(\w+=\S*\s+)*((npm|pnpm|yarn|bun)\s+(run\s+)?test|(npx\s+|pnpm\s+exec\s+)?(vitest|jest)|dotnet\s+test)\b/
 
 export const isTestCommand = (command: string): boolean => TEST_COMMAND.test(command.trim())
 
