@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
-import { TICK_MS, SLEEP_AFTER_TICKS } from './cat'
+import { TICK_MS, SLEEP_AFTER_TICKS, RUFFLED_TICKS, PROUD_TICKS, remarkFor } from './cat'
 
 export const SURFACES = ['terminal', 'desktop'] as const
 
@@ -30,7 +30,7 @@ const START = { cwd: 'C:/x', surface: 'desktop' as const, isInteractive: true }
 test('the clock ticks and the tail flicks', async ($, on) => {
   const clock = mock.clock(on)
   mock.store(on)
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
   const before = (await ui.find({ key: 'row2' }))?.text
@@ -42,7 +42,7 @@ test('the clock ticks and the tail flicks', async ($, on) => {
 test('sleeps after two idle minutes and a tool call wakes her', async ($, on) => {
   const clock = mock.clock(on)
   mock.store(on)
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: '' } }))
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
@@ -56,7 +56,7 @@ test('sleeps after two idle minutes and a tool call wakes her', async ($, on) =>
 test('still mode stops tick writes but a mood change still redraws', async ($, on) => {
   const clock = mock.clock(on)
   mock.store(on, { isStill: true })
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: 'boom' }, isError: true }))
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
@@ -79,7 +79,7 @@ const memoryStore = (on: On, entries: Record<string, unknown> = {}) => {
 test('a failed Bash call ruffles Mango and counts an error survived', async ($, on) => {
   mock.clock(on)
   const data = memoryStore(on, { errorsSurvived: 'not a number' })
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: 'boom' }, isError: true }))
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
@@ -92,7 +92,7 @@ test('a failed Bash call ruffles Mango and counts an error survived', async ($, 
 test('a green test run makes Mango proud; ls does not', async ($, on) => {
   mock.clock(on)
   memoryStore(on)
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: 'ok', stderr: '' } }))
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
@@ -105,7 +105,7 @@ test('a green test run makes Mango proud; ls does not', async ($, on) => {
 test('a denied Bash call is neither an error nor a success for Mango', async ($, on) => {
   mock.clock(on)
   const data = memoryStore(on)
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   on('tool.call', { tool: 'Bash' }, () => ({ deny: 'no' }))
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
@@ -119,7 +119,7 @@ test('a denied Bash call is neither an error nor a success for Mango', async ($,
 test('the Bash hook throwing after next still returns the result once', async ($, on) => {
   mock.clock(on)
   let runs = 0
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   on('store.set', () => { throw new Error('store down') })
   on('store.get', () => ({ value: undefined }))
   on('tool.call', { tool: 'Bash' }, () => { runs += 1; return { result: { stdout: '', stderr: 'x' }, isError: true } })
@@ -140,7 +140,7 @@ const TURN = { answer: '', durationMs: 1000, isAborted: false, turnId: 't1', rea
 test('crossing 20 % worries Mango and toasts once; dropping below calms her', async ($, on) => {
   mock.clock(on)
   mock.store(on)
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   on('turn.complete', (_$, e) => ({ text: e.answer }))
   let percent = 25
   const toasts: string[] = []
@@ -161,7 +161,7 @@ test('crossing 20 % worries Mango and toasts once; dropping below calms her', as
 test('percent absent and window 0 leaves the previous value', async ($, on) => {
   mock.clock(on)
   mock.store(on)
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   on('turn.complete', (_$, e) => ({ text: e.answer }))
   let usage = usageAt(15)
   on('session.usage', () => ({ value: usage }))
@@ -176,7 +176,7 @@ test('percent absent and window 0 leaves the previous value', async ($, on) => {
 test('a long turn gets a yawn, an aborted long turn does not', async ($, on) => {
   mock.clock(on)
   mock.store(on)
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   on('turn.complete', (_$, e) => ({ text: e.answer }))
   on('session.usage', () => ({ value: usageAt(5) }))
   await $.session.start(START)
@@ -190,7 +190,7 @@ test('a long turn gets a yawn, an aborted long turn does not', async ($, on) => 
 test('submitting a prompt clears the remark', async ($, on) => {
   mock.clock(on)
   memoryStore(on)
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  answerStart(on)
   on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: 'boom' }, isError: true }))
   on('prompt.submit', (_$, e) => e)
   await $.session.start(START)
@@ -359,4 +359,161 @@ test('a band narrower than the art draws the art and an empty line', async ($, o
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: { ...BAND, bodyColumns: 8 } })
   expect(await ui.find({ key: 'row2' })).toBeDefined()
   expect((await ui.find({ key: 'line' }))?.text ?? '').toBe('')
+})
+
+// Time tests. A failed Bash call at tick 0 ruffles Mango until RUFFLED_TICKS; the line is a
+// ruffled remark until then and the stats line after.
+const failBash = (on: On) => on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: 'boom' }, isError: true }))
+
+test('a ruffled mood expires and takes its remark with it', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  failBash(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'e1' })
+  expect((await ui.find({ key: 'row2' }))?.text).toContain('>.<')
+  expect((await ui.find({ key: 'line' }))?.text).toMatch(/^Mango/)
+  await clock.advance(TICK_MS * (RUFFLED_TICKS - 1))
+  expect((await ui.find({ key: 'row2' }))?.text).toContain('>.<')
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ key: 'row2' }))?.text).not.toContain('>.<')
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+})
+
+test('a proud mood expires and takes its remark with it', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: 'ok', stderr: '' } }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  await $.tool.call({ tool: 'Bash', command: 'npm test', tool_use_id: 'e2' })
+  expect((await ui.find({ key: 'row2' }))?.text).toContain('^.^')
+  await clock.advance(TICK_MS * PROUD_TICKS)
+  expect((await ui.find({ key: 'row2' }))?.text).not.toContain('^.^')
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+})
+
+test('still mode: a ruffled mood expires and takes its remark with it', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on, { isStill: true })
+  answerStart(on)
+  failBash(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'e3' })
+  expect((await ui.find({ key: 'row2' }))?.text).toContain('>.<')
+  await clock.advance(TICK_MS * RUFFLED_TICKS)
+  expect((await ui.find({ key: 'row2' }))?.text).not.toContain('>.<')
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+})
+
+test('a later remark survives the expiry of a timed mood', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  failBash(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'e4' })
+  await run($, 'pet')
+  await clock.advance(TICK_MS * RUFFLED_TICKS)
+  expect((await ui.find({ key: 'row2' }))?.text).not.toContain('>.<')
+  expect((await ui.find({ key: 'line' }))?.text).toMatch(/^Mango/)
+})
+
+test('falling asleep sets a sleeping remark and a tool call clears it', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: '' } }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  await clock.advance(TICK_MS * SLEEP_AFTER_TICKS)
+  expect((await ui.find({ key: 'row2' }))?.text).toMatch(/z/)
+  expect((await ui.find({ key: 'line' }))?.text).toBe(remarkFor('sleeping', SLEEP_AFTER_TICKS))
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'e5' })
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+})
+
+test('a prompt wakes a sleeping Mango', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  on('prompt.submit', (_$, e) => e)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  await clock.advance(TICK_MS * SLEEP_AFTER_TICKS)
+  expect((await ui.find({ key: 'row2' }))?.text).toMatch(/z/)
+  await $.prompt.submit({ text: 'hi', wait: false, origin: { kind: 'composer' } })
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ key: 'row2' }))?.text).not.toMatch(/z/)
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+})
+
+test('still mode: Mango still falls asleep, with her sleeping remark', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on, { isStill: true })
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  await clock.advance(TICK_MS * SLEEP_AFTER_TICKS)
+  expect((await ui.find({ key: 'row2' }))?.text).toMatch(/z/)
+  expect((await ui.find({ key: 'line' }))?.text).toBe(remarkFor('sleeping', SLEEP_AFTER_TICKS))
+})
+
+test('still mode never draws the blink frame on an awake cat', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on, { isStill: true })
+  answerStart(on)
+  await $.session.start(START)
+  const wide = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect((await wide.find({ key: 'row2' }))?.text).toMatch(/^\( o\.o \)/)
+  const short = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: { ...BAND, maxRows: 2 } })
+  expect((await short.find({ key: 'face' }))?.text).toBe('(o.o)')
+})
+
+test('session.start reads the context figure once, without a toast', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  const toasts: string[] = []
+  on('session.usage', () => ({ value: usageAt(30) }))
+  on('ui.toast', (_, e) => { toasts.push(e.text); return { value: undefined } })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 30 %')
+  expect(toasts).toHaveLength(0)
+})
+
+test('a store failure in session.start still registers /mango and starts the clock', async ($, on) => {
+  const clock = mock.clock(on)
+  const registered: string[] = []
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('command.register', (_, e) => { registered.push(e.name); return { value: { command: 'mango' } } })
+  on('store.get', () => { throw new Error('store down') })
+  await $.session.start(START)
+  expect(registered).toEqual(['mango'])
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const before = (await ui.find({ key: 'row2' }))?.text
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ key: 'row2' }))?.text).not.toBe(before)
+})
+
+test('a failing toast does not skip the budget bookkeeping', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  on('turn.complete', (_$, e) => ({ text: e.answer }))
+  on('session.usage', () => ({ value: usageAt(25) }))
+  let toasts = 0
+  on('ui.toast', () => { toasts += 1; throw new Error('toast down') })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  await $.turn.complete(TURN)
+  expect((await ui.find({ key: 'line' }))?.text).toBe(remarkFor('worried', 0))
+  await $.turn.complete({ ...TURN, turnId: 't2' })
+  expect(toasts).toBe(1)
 })
