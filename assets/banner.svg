@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" role="img" aria-labelledby="title desc">
   <title id="title">Mango</title>
-  <desc id="desc">A fluffy black cat with mango-orange eyes sits on a pink cushion in front of a glowing mango-coloured moon, under a night sky with twinkling stars.</desc>
+  <desc id="desc">Mango, a long-haired black cat with a white ruff, white paws, long white whiskers and amber eyes, lies in a loaf on a blue knitted cushion in front of a glowing moon, under a night sky with twinkling stars.</desc>
   <defs>
     <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#2b1c40"/>
@@ -17,15 +17,34 @@
       <stop offset="1" stop-color="#ff9a3c"/>
     </linearGradient>
     <linearGradient id="cushion" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f7a8c8"/>
-      <stop offset="1" stop-color="#d96f9c"/>
+      <stop offset="0" stop-color="#6a95d8"/>
+      <stop offset="1" stop-color="#2c4c8a"/>
     </linearGradient>
+    <pattern id="knit" width="14" height="11" patternUnits="userSpaceOnUse">
+      <path d="M 1.5 1.5 L 7 9 M 12.5 1.5 L 7 9" stroke="#9cbcec" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+      <path d="M 2.5 3.5 L 7 9.8 M 11.5 3.5 L 7 9.8" stroke="#24406f" stroke-width="1" stroke-linecap="round" fill="none" opacity="0.6"/>
+    </pattern>
+    <radialGradient id="coat" cx="0.32" cy="0.28" r="0.85">
+      <stop offset="0" stop-color="#4f3122"/>
+      <stop offset="0.45" stop-color="#21161a"/>
+      <stop offset="1" stop-color="#0d0a10"/>
+    </radialGradient>
+    <linearGradient id="plume" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#140e12"/>
+      <stop offset="0.6" stop-color="#3d2519"/>
+      <stop offset="1" stop-color="#140e12"/>
+    </linearGradient>
+    <radialGradient id="iris" cx="0.5" cy="0.5" r="0.55">
+      <stop offset="0" stop-color="#ffd768"/>
+      <stop offset="0.7" stop-color="#f2a92e"/>
+      <stop offset="1" stop-color="#b8701a"/>
+    </radialGradient>
     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur stdDeviation="28"/>
     </filter>
     <filter id="fur" x="-10%" y="-10%" width="120%" height="120%">
       <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7"/>
-      <feDisplacementMap in="SourceGraphic" scale="9" xChannelSelector="R" yChannelSelector="G"/>
+      <feDisplacementMap in="SourceGraphic" scale="12" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
     <clipPath id="card"><rect width="1200" height="400" rx="28"/></clipPath>
   </defs>
@@ -34,11 +53,11 @@
     .s2 { animation-delay: 1.3s; }
     .s3 { animation-delay: 2.6s; }
     .eyes { transform-box: fill-box; transform-origin: center; animation: blink 6s infinite; }
-    .tail { transform-origin: 398px 338px; animation: swish 3.2s ease-in-out infinite; }
+    .tail { transform-origin: 410px 320px; animation: swish 3.2s ease-in-out infinite; }
     .heart { animation: float 5s ease-in-out infinite; }
     @keyframes twinkle { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
     @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
-    @keyframes swish { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(9deg); } }
+    @keyframes swish { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(3deg); } }
     @keyframes float { 0%, 100% { transform: translateY(0); opacity: 0.9; } 50% { transform: translateY(-8px); opacity: 0.6; } }
     @media (prefers-reduced-motion: reduce) { .star, .eyes, .tail, .heart { animation: none; } }
   </style>
@@ -50,7 +69,7 @@
       <circle class="star" cx="80" cy="60" r="2.5"/>
       <circle class="star s2" cx="170" cy="120" r="1.8"/>
       <circle class="star s3" cx="540" cy="48" r="2.2"/>
-      <circle class="star" cx="640" cy="330" r="1.6"/>
+      <circle class="star" cx="575" cy="372" r="1.6"/>
       <circle class="star s2" cx="1010" cy="70" r="2.4"/>
       <circle class="star s3" cx="1120" cy="150" r="1.8"/>
       <circle class="star s2" cx="1150" cy="340" r="2"/>
@@ -62,58 +81,86 @@
     <circle cx="330" cy="200" r="165" fill="#ffb347" opacity="0.35" filter="url(#glow)"/>
     <circle cx="330" cy="200" r="150" fill="url(#moon)"/>
 
-    <ellipse cx="330" cy="372" rx="150" ry="30" fill="url(#cushion)"/>
-    <ellipse cx="330" cy="362" rx="128" ry="16" fill="#f9bcd5" opacity="0.6"/>
+    <ellipse cx="330" cy="364" rx="166" ry="36" fill="url(#cushion)"/>
+    <ellipse cx="330" cy="364" rx="166" ry="36" fill="url(#knit)" opacity="0.75"/>
+    <ellipse cx="330" cy="342" rx="138" ry="12" fill="#a9c5f0" opacity="0.35"/>
 
-    <g filter="url(#fur)" fill="#120e16">
-      <path class="tail" d="M 398 338 C 470 345 500 290 468 246" stroke="#120e16" stroke-width="26" stroke-linecap="round" fill="none"/>
-      <ellipse cx="330" cy="292" rx="90" ry="76"/>
-      <circle cx="330" cy="188" r="64"/>
-      <circle cx="282" cy="208" r="30"/>
-      <circle cx="378" cy="208" r="30"/>
-      <path d="M 272 158 L 280 92 L 322 134 Z"/>
-      <path d="M 388 158 L 380 92 L 338 134 Z"/>
-      <ellipse cx="300" cy="356" rx="24" ry="13"/>
-      <ellipse cx="360" cy="356" rx="24" ry="13"/>
+    <g filter="url(#fur)">
+      <path d="M 438.0 300.0 L 448.4 306.6 L 435.9 310.9 L 446.1 320.1 L 429.8 321.4 L 435.8 332.0 L 419.8 331.1 L 424.2 344.3 L 406.4 339.6 L 407.4 354.1 L 390.0 346.6 L 385.4 357.9 L 371.3 351.7 L 364.0 362.4 L 351.1 354.9 L 342.1 371.3 L 330.0 356.0 L 318.3 366.8 L 308.9 354.9 L 295.5 364.0 L 288.7 351.7 L 271.1 364.3 L 270.0 346.6 L 253.4 353.2 L 253.6 339.6 L 234.4 345.4 L 240.2 331.1 L 223.5 332.4 L 230.2 321.4 L 213.2 320.3 L 224.1 310.9 L 212.3 306.5 L 222.0 300.0 L 208.5 293.1 L 224.1 289.1 L 211.5 279.1 L 230.2 278.6 L 223.1 267.4 L 240.2 268.9 L 235.0 255.0 L 253.6 260.4 L 252.4 245.6 L 270.0 253.4 L 274.6 242.1 L 288.7 248.3 L 294.3 232.0 L 308.9 245.1 L 318.1 230.6 L 330.0 244.0 L 341.7 232.9 L 351.1 245.1 L 364.1 237.5 L 371.3 248.3 L 388.4 236.6 L 390.0 253.4 L 406.6 246.8 L 406.4 260.4 L 424.9 255.1 L 419.8 268.9 L 439.3 266.1 L 429.8 278.6 L 447.4 279.5 L 435.9 289.1 L 453.7 292.9 Z" fill="url(#coat)"/>
+      <g class="tail">
+        <path d="M 404 318 C 440 314 462 330 460 348 C 458 362 440 368 418 367 C 404 366 394 363 386 358" stroke="#160f14" stroke-width="30" stroke-linecap="round" fill="none"/>
+        <path d="M 428 322 C 446 326 452 338 450 348" stroke="#3e2619" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.55"/>
+      </g>
+      <path d="M 272 168 L 278 88 L 324 132 Z" fill="#120e16"/>
+      <path d="M 388 168 L 382 88 L 336 132 Z" fill="#120e16"/>
+      <path d="M 390.0 196.0 L 399.2 203.8 L 388.5 209.4 L 396.4 219.2 L 384.1 222.0 L 389.8 233.6 L 376.9 233.4 L 380.5 246.5 L 367.4 242.9 L 367.4 255.5 L 356.0 250.1 L 353.5 263.3 L 343.4 254.5 L 337.4 262.0 L 330.0 256.0 L 322.3 264.4 L 316.6 254.5 L 306.4 263.4 L 304.0 250.1 L 292.9 255.1 L 292.6 242.9 L 279.7 246.3 L 283.1 233.4 L 273.3 231.6 L 275.9 222.0 L 265.0 218.7 L 271.5 209.4 L 262.8 203.6 L 270.0 196.0 L 261.2 188.2 L 271.5 182.6 L 264.5 173.1 L 275.9 170.0 L 273.8 160.7 L 283.1 158.6 L 282.3 148.3 L 292.6 149.1 L 293.9 138.6 L 304.0 141.9 L 306.5 128.7 L 316.6 137.5 L 322.1 126.0 L 330.0 136.0 L 337.5 129.3 L 343.4 137.5 L 353.3 129.4 L 356.0 141.9 L 365.7 139.2 L 367.4 149.1 L 379.2 146.8 L 376.9 158.6 L 386.7 160.4 L 384.1 170.0 L 392.6 174.1 L 388.5 182.6 L 400.6 188.0 Z" fill="url(#coat)"/>
+      <circle cx="280" cy="214" r="32" fill="#150f14"/>
+      <circle cx="380" cy="214" r="32" fill="#150f14"/>
+      <path d="M 262 198 L 232 214 L 258 222 L 238 240 L 270 238 L 262 256 L 290 244 Z" fill="#150f14"/>
+      <path d="M 398 198 L 428 214 L 402 222 L 422 240 L 390 238 L 398 256 L 370 244 Z" fill="#150f14"/>
     </g>
-    <path d="M 284 140 L 288 108 L 308 130 Z" fill="#5a2a44"/>
-    <path d="M 376 140 L 372 108 L 352 130 Z" fill="#5a2a44"/>
+    <g fill="none" stroke-linecap="round">
+      <path d="M 238 270 Q 262 248 296 246" stroke="#6b4330" stroke-width="3" opacity="0.45"/>
+      <path d="M 232 296 Q 248 276 270 268" stroke="#6b4330" stroke-width="3" opacity="0.35"/>
+      <path d="M 288 150 Q 304 138 322 138" stroke="#6b4330" stroke-width="3" opacity="0.4"/>
+    </g>
+
+    <path d="M 286 150 L 288 106 L 314 134 Z" fill="#3a2219"/>
+    <path d="M 374 150 L 372 106 L 346 134 Z" fill="#3a2219"/>
+    <g stroke="#efe7da" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.85">
+      <path d="M 292 146 Q 290 128 292 112"/>
+      <path d="M 298 144 Q 300 130 306 120"/>
+      <path d="M 288 140 Q 284 128 286 118"/>
+      <path d="M 368 146 Q 370 128 368 112"/>
+      <path d="M 362 144 Q 360 130 354 120"/>
+      <path d="M 372 140 Q 376 128 374 118"/>
+      <path d="M 278 92 L 275 82"/>
+      <path d="M 279 92 L 282 83"/>
+      <path d="M 382 92 L 385 82"/>
+      <path d="M 381 92 L 378 83"/>
+    </g>
+
+    <g filter="url(#fur)" fill="#f4efe6">
+      <path d="M 280 230 L 268 248 L 284 246 L 276 268 L 294 260 L 290 284 L 306 274 L 308 298 L 320 284 L 330 308 L 340 284 L 352 298 L 354 274 L 370 284 L 366 260 L 384 268 L 376 246 L 392 248 L 380 230 Q 330 252 280 230 Z"/>
+      <ellipse cx="298" cy="352" rx="26" ry="14"/>
+      <ellipse cx="362" cy="352" rx="26" ry="14"/>
+    </g>
+    <g stroke="#b9ae9f" stroke-width="1.6" stroke-linecap="round">
+      <path d="M 290 356 L 290 364"/><path d="M 300 357 L 300 365"/>
+      <path d="M 360 357 L 360 365"/><path d="M 370 356 L 370 364"/>
+    </g>
 
     <g class="eyes">
-      <ellipse cx="305" cy="186" rx="14" ry="11" fill="#ffb740"/>
-      <ellipse cx="355" cy="186" rx="14" ry="11" fill="#ffb740"/>
-      <ellipse cx="305" cy="186" rx="3.5" ry="9" fill="#120e16"/>
-      <ellipse cx="355" cy="186" rx="3.5" ry="9" fill="#120e16"/>
-      <circle cx="309" cy="182" r="2.4" fill="#fff6e6"/>
-      <circle cx="359" cy="182" r="2.4" fill="#fff6e6"/>
+      <ellipse cx="305" cy="190" rx="15" ry="12" fill="url(#iris)"/>
+      <ellipse cx="355" cy="190" rx="15" ry="12" fill="url(#iris)"/>
+      <ellipse cx="305" cy="190" rx="3.5" ry="10" fill="#0d0a10"/>
+      <ellipse cx="355" cy="190" rx="3.5" ry="10" fill="#0d0a10"/>
+      <circle cx="309.5" cy="185.5" r="2.6" fill="#fff6e6"/>
+      <circle cx="359.5" cy="185.5" r="2.6" fill="#fff6e6"/>
     </g>
-    <circle cx="288" cy="208" r="8" fill="#f7a1c4" opacity="0.28"/>
-    <circle cx="372" cy="208" r="8" fill="#f7a1c4" opacity="0.28"/>
-    <path d="M 324 204 L 336 204 L 330 211 Z" fill="#f7a1c4"/>
-    <g stroke="#fff1d6" stroke-width="1.6" stroke-linecap="round" opacity="0.55" fill="none">
-      <path d="M 300 212 Q 268 206 238 200"/>
-      <path d="M 300 218 Q 268 220 240 226"/>
-      <path d="M 360 212 Q 392 206 422 200"/>
-      <path d="M 360 218 Q 392 220 420 226"/>
+    <path d="M 324 208 L 336 208 L 330 215 Z" fill="#2c2026"/>
+    <path d="M 326 209 L 331 209" stroke="#5a4650" stroke-width="1.4" stroke-linecap="round"/>
+    <g stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" fill="none" opacity="0.95">
+      <path d="M 304 216 Q 262 206 204 196"/>
+      <path d="M 304 221 Q 258 220 200 224"/>
+      <path d="M 306 226 Q 266 234 214 250"/>
+      <path d="M 356 216 Q 398 206 456 196"/>
+      <path d="M 356 221 Q 402 220 460 224"/>
+      <path d="M 354 226 Q 394 234 446 250"/>
     </g>
 
     <g class="heart">
       <path d="M 452 150 c -6 -10 -22 -6 -20 6 c 2 10 20 20 20 20 c 0 0 18 -10 20 -20 c 2 -12 -14 -16 -20 -6 z" fill="#f7a1c4"/>
     </g>
 
-    <g transform="translate(500 350)">
-      <ellipse cx="0" cy="0" rx="22" ry="17" fill="#ffb347" transform="rotate(-20)"/>
-      <path d="M 6 -15 q 14 -14 26 -6 q -12 10 -26 6 z" fill="#8fd694"/>
-    </g>
+    <text x="620" y="158" font-family="ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="112" font-weight="800" fill="url(#name)">Mango</text>
+    <text x="624" y="230" font-family="ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="27" fill="#fff1d6">a fluffy black cat who lives</text>
+    <text x="624" y="264" font-family="ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="27" fill="#fff1d6">above your Claude Code prompt</text>
 
-    <text x="620" y="170" font-family="ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="112" font-weight="800" fill="url(#name)">Mango</text>
-    <text x="624" y="218" font-family="ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="27" fill="#fff1d6">a fluffy black cat who lives</text>
-    <text x="624" y="252" font-family="ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="27" fill="#fff1d6">above your Claude Code prompt</text>
-
-    <rect x="620" y="282" width="480" height="76" rx="14" fill="#0f0b14" opacity="0.75"/>
+    <rect x="620" y="292" width="480" height="76" rx="14" fill="#0f0b14" opacity="0.75"/>
     <g font-family="ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace" font-size="20" style="white-space: pre">
-      <text x="640" y="313" fill="#ffb347">&#160;/\_/\</text>
-      <text x="640" y="341" fill="#ffb347">( o.o ) ~<tspan fill="#fff1d6" dx="16">Mango blinks slowly at you.</tspan></text>
+      <text x="640" y="323" fill="#ffb347">&#160;/\_/\</text>
+      <text x="640" y="351" fill="#ffb347">( o.o ) ~<tspan fill="#fff1d6" dx="16">Mango blinks slowly at you.</tspan></text>
     </g>
   </g>
 </svg>
