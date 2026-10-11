@@ -4,7 +4,7 @@
 
 <p align="center">
   <b>A fluffy black cat who lives above your Claude Code prompt.</b><br>
-  <i>In loving memory of my Mango, the most amazing cat who ever lived.</i> 🧡
+  <i>In loving memory of my Mango, the most amazing cat who ever lived.</i> ❤️
 </p>
 
 ---
@@ -68,8 +68,8 @@ The `.claude-plugin/types/` folder that `tsconfig.json` extends is laid by the e
 
 Contributions are welcome and come in under this repo's MIT licence.
 
-## 🧡 Why she exists
+## ❤️ Why she exists
 
 Mango was my cat. A fluffy black cat, the most amazing cat who ever lived, and I miss her every single day. I built this so a small part of her can sit with me while I code, and maybe keep you company too.
 
-<p align="center"><i>Made with love, for Mango.</i> 🐈‍⬛🥭</p>
+<p align="center"><i>Made with love, for Mango.</i> 🐈‍⬛❤️</p>
