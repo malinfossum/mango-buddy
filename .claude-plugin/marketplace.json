@@ -1,0 +1,8 @@
+{
+  "name": "mango-buddy",
+  "description": "A fluffy black cat above the prompt, in memory of Mango.",
+  "owner": { "name": "Malin Fossum" },
+  "plugins": [
+    { "name": "mango", "source": "./", "description": "A fluffy black cat above the prompt, in memory of Mango.", "author": { "name": "Malin Fossum" } }
+  ]
+}
