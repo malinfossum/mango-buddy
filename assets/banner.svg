@@ -150,7 +150,7 @@
     </g>
 
     <g class="heart">
-      <path d="M 452 150 c -6 -10 -22 -6 -20 6 c 2 10 20 20 20 20 c 0 0 18 -10 20 -20 c 2 -12 -14 -16 -20 -6 z" fill="#e5484d"/>
+      <path d="M 424 120 c -6 -10 -22 -6 -20 6 c 2 10 20 20 20 20 c 0 0 18 -10 20 -20 c 2 -12 -14 -16 -20 -6 z" fill="#e5484d"/>
     </g>
 
     <text x="620" y="158" font-family="ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif" font-size="112" font-weight="800" fill="url(#name)">Mango</text>
