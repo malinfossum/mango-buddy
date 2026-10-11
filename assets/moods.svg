@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 380" width="1200" height="380" role="img" aria-labelledby="title desc">
+  <title id="title">Mango's moods</title>
+  <desc id="desc">Six colour cards, one per mood. Awake: just being here. Working: kneads while Claude works. Proud: purrs at green test runs. Sleeping: naps when you go quiet. Ruffled: after a failed command. Worried: when context passes 20 percent.</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2b1c40"/>
+      <stop offset="0.55" stop-color="#1c1429"/>
+      <stop offset="1" stop-color="#3a1f33"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .art { font-family: ui-monospace, 'Cascadia Code', Consolas, 'Courier New', monospace; font-size: 24px; white-space: pre; }
+    .name { font-family: ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif; font-size: 28px; font-weight: 800; }
+    .what { font-family: ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif; font-size: 19px; fill: #fff1d6; opacity: 0.85; }
+  </style>
+  <rect width="1200" height="380" rx="28" fill="url(#sky)"/>
+
+  <g transform="translate(24 24)">
+    <rect width="372" height="157" rx="20" fill="#fff1d6" fill-opacity="0.12" stroke="#fff1d6" stroke-opacity="0.55" stroke-width="2"/>
+    <text class="art" x="28" y="40" fill="#fff1d6"> /\_/\</text>
+    <text class="art" x="28" y="68" fill="#fff1d6">( o.o ) ~</text>
+    <text class="name" x="28" y="108" fill="#fff1d6">awake</text>
+    <text class="what" x="28" y="134">just being here</text>
+  </g>
+  <g transform="translate(414 24)">
+    <rect width="372" height="157" rx="20" fill="#8fd694" fill-opacity="0.12" stroke="#8fd694" stroke-opacity="0.55" stroke-width="2"/>
+    <text class="art" x="28" y="40" fill="#8fd694"> /\_/\</text>
+    <text class="art" x="28" y="68" fill="#8fd694">( o.o )nn</text>
+    <text class="name" x="28" y="108" fill="#8fd694">working</text>
+    <text class="what" x="28" y="134">kneads while Claude works</text>
+  </g>
+  <g transform="translate(804 24)">
+    <rect width="372" height="157" rx="20" fill="#ffb347" fill-opacity="0.12" stroke="#ffb347" stroke-opacity="0.55" stroke-width="2"/>
+    <text class="art" x="28" y="40" fill="#ffb347"> /\_/\</text>
+    <text class="art" x="28" y="68" fill="#ffb347">( ^.^ ) *</text>
+    <text class="name" x="28" y="108" fill="#ffb347">proud</text>
+    <text class="what" x="28" y="134">purrs at green test runs</text>
+  </g>
+  <g transform="translate(24 199)">
+    <rect width="372" height="157" rx="20" fill="#b9a6ff" fill-opacity="0.12" stroke="#b9a6ff" stroke-opacity="0.55" stroke-width="2"/>
+    <text class="art" x="28" y="40" fill="#b9a6ff"> /\_/\</text>
+    <text class="art" x="28" y="68" fill="#b9a6ff">( -.- )zz</text>
+    <text class="name" x="28" y="108" fill="#b9a6ff">sleeping</text>
+    <text class="what" x="28" y="134">naps when you go quiet</text>
+  </g>
+  <g transform="translate(414 199)">
+    <rect width="372" height="157" rx="20" fill="#ff8a80" fill-opacity="0.12" stroke="#ff8a80" stroke-opacity="0.55" stroke-width="2"/>
+    <text class="art" x="28" y="40" fill="#ff8a80"> \/_\/</text>
+    <text class="art" x="28" y="68" fill="#ff8a80">( &gt;.&lt; ) !</text>
+    <text class="name" x="28" y="108" fill="#ff8a80">ruffled</text>
+    <text class="what" x="28" y="134">after a failed command</text>
+  </g>
+  <g transform="translate(804 199)">
+    <rect width="372" height="157" rx="20" fill="#8ac7ff" fill-opacity="0.12" stroke="#8ac7ff" stroke-opacity="0.55" stroke-width="2"/>
+    <text class="art" x="28" y="40" fill="#8ac7ff"> /\_/\</text>
+    <text class="art" x="28" y="68" fill="#8ac7ff">( O.O )</text>
+    <text class="name" x="28" y="108" fill="#8ac7ff">worried</text>
+    <text class="what" x="28" y="134">when context passes 20 %</text>
+  </g>
+</svg>
