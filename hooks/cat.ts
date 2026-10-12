@@ -73,12 +73,36 @@ export const toneFor = (pose: Pose): string => {
 type Voice = Exclude<Mood, 'awake'> | 'purr' | 'yawn'
 
 const REMARKS: Record<Voice, readonly string[]> = {
-  sleeping: ['Mango is asleep. Type gently.', 'Mango dreams of warm laptops.', 'Mango curls up on the prompt.', 'Mango is off duty.'],
-  ruffled: ['Mango did not like that one.', 'Mango flattens her ears.', 'Mango knocks the error off the table.', 'Mango stares at the stack trace.', 'Mango will allow one retry.'],
-  proud: ['Mango purrs at the green run.', 'Mango knew you would get it.', 'Mango stretches. Tests pass.', 'Mango sits taller now.', 'Mango is pleased.'],
-  worried: ['Mango eyes the context meter.', 'Mango thinks this is a lot of context.', 'Mango suggests saving and clearing soon.', 'Mango paces. The window is filling.'],
-  purr: ['Mango purrs.', 'Mango leans into your hand.', 'Mango closes her eyes and rumbles.', 'Mango headbutts the cursor.'],
-  yawn: ['Mango yawns. That was a long one.', 'Mango checks the clock. Still here.', 'Mango stretches after the long turn.', 'Mango wonders if you need a break too.'],
+  sleeping: [
+    'Mango is asleep. Type gently.', 'Mango dreams of warm laptops.', 'Mango curls up on the prompt.', 'Mango is off duty.',
+    'Mango snores, very softly.', 'Mango tucks her white paws under.', 'Mango twitches. She is chasing a bug in her dreams.',
+    'Mango is a loaf now.', 'Mango keeps one ear on the keyboard.', 'Mango sleeps on the warm side of the screen.',
+  ],
+  ruffled: [
+    'Mango did not like that one.', 'Mango flattens her ears.', 'Mango knocks the error off the table.', 'Mango stares at the stack trace.', 'Mango will allow one retry.',
+    'Mango fluffs up her ruff.', 'Mango hisses at the exit code.', 'Mango swats at the red text.',
+    'Mango turns her back on the terminal.', 'Mango says read it again, slowly.', 'Mango blames the semicolon.',
+  ],
+  proud: [
+    'Mango purrs at the green run.', 'Mango knew you would get it.', 'Mango stretches. Tests pass.', 'Mango sits taller now.', 'Mango is pleased.',
+    'Mango slow-blinks at you.', 'Mango kneads in celebration.', 'Mango brings you a green tick.',
+    'Mango flicks her tail. Well done.', 'Mango approves this commit.', 'Mango puffs out her white ruff.',
+  ],
+  worried: [
+    'Mango eyes the context meter.', 'Mango thinks this is a lot of context.', 'Mango suggests saving and clearing soon.', 'Mango paces. The window is filling.',
+    'Mango counts the tokens twice.', 'Mango says write it down before you forget.', 'Mango wants a fresh session soon.',
+    'Mango sits on the memory file to keep it safe.', 'Mango taps the save key with one paw.', 'Mango thinks a recap would fit nicely here.',
+  ],
+  purr: [
+    'Mango purrs.', 'Mango leans into your hand.', 'Mango closes her eyes and rumbles.', 'Mango headbutts the cursor.',
+    'Mango rolls over. The belly is a trap.', 'Mango kneads your sleeve.', 'Mango slow-blinks. That means love.',
+    'Mango tucks her head under your chin.', 'Mango purrs louder than the fans.', 'Mango lets you stroke her ruff.',
+  ],
+  yawn: [
+    'Mango yawns. That was a long one.', 'Mango checks the clock. Still here.', 'Mango stretches after the long turn.', 'Mango wonders if you need a break too.',
+    'Mango yawns and shows every tooth.', 'Mango stretched twice while that ran.', 'Mango thinks water and a stretch would help.',
+    'Mango opens one eye. Is it done?', 'Mango groomed both paws while she waited.', 'Mango has counted every star on the ceiling.',
+  ],
 }
 
 export const remarkFor = (mood: Voice, tick: number): string => {
