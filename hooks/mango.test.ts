@@ -36,18 +36,34 @@ test('the desktop draws a picture of Mango and a line, no ASCII rows', async ($,
   expect(await ui.find({ key: 'line' })).toBeDefined()
 })
 
-test('the desktop picture follows the clock and the mood', async ($, on) => {
+test('the desktop picture keeps its markup across ticks and changes with the mood', async ($, on) => {
   const clock = mock.clock(on)
   mock.store(on)
   answerStart(on)
   on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: 'boom' }, isError: true }))
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
-  const before = (await ui.find({ type: 'Svg' }))?.props.source
+  const before = await ui.find({ type: 'Svg' })
+  expect(before?.props.isInteractive).toBe(true)
+  // A changed source would reload the frame and restart her animations.
   await clock.advance(TICK_MS)
-  expect((await ui.find({ type: 'Svg' }))?.props.source).not.toBe(before)
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.source).toBe(before?.props.source)
   await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'd1' })
-  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
+  const after = await ui.find({ type: 'Svg' })
+  expect(after?.props.alt).toBe('Mango, a black cat, is ruffled.')
+  expect(after?.props.source).not.toBe(before?.props.source)
+})
+
+test('still mode draws the desktop picture as a plain image, without motion', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on, { isStill: true })
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.isInteractive).toBe(false)
+  expect(String(cat?.props.source)).not.toContain('<style>')
 })
 
 test('a short desktop band draws the picture at half size', async ($, on) => {

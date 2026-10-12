@@ -66,22 +66,38 @@ const POSES = ['awake', 'sleeping', 'ruffled', 'proud', 'worried', 'working'] as
 test('every pose draws a self-contained svg with its own alt text', () => {
   const alts = new Set<string>()
   for (const pose of POSES) {
-    const svg = drawingFor(pose, 1)
-    expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"'), pose).toBe(true)
-    expect(svg.endsWith('</svg>'), pose).toBe(true)
-    expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=/i)
-    expect(svg).toMatch(/^[ -~]+$/)
+    for (const isAnimated of [true, false]) {
+      const svg = drawingFor(pose, isAnimated)
+      expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"'), pose).toBe(true)
+      expect(svg.endsWith('</svg>'), pose).toBe(true)
+      expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=|url\((?!#coat\))/i)
+      expect(svg).toMatch(/^[ -~]+$/)
+    }
     alts.add(altFor(pose))
   }
   expect(alts.size).toBe(POSES.length)
 })
 
-test('the picture blinks on every eighth tick, swishes on odd ticks and kneads in turn', () => {
-  expect(drawingFor('awake', 8)).not.toBe(drawingFor('awake', 16 + 2))
-  expect(drawingFor('awake', 1)).not.toBe(drawingFor('awake', 2))
-  expect(drawingFor('working', 0)).not.toBe(drawingFor('working', 1))
-  expect(drawingFor('working', 0)).toBe(drawingFor('working', 2))
-  expect(drawingFor('proud', 0)).toBe(drawingFor('proud', 1))
+test('every pose moves in its own way, and stops for reduced motion', () => {
+  const styles = new Set<string>()
+  for (const pose of POSES) {
+    const svg = drawingFor(pose, true)
+    expect(svg, pose).toMatch(/<style>.*@keyframes/)
+    expect(svg, pose).toContain('prefers-reduced-motion:reduce')
+    expect(svg, pose).toContain('svg:hover .heart')
+    styles.add(svg.slice(svg.indexOf('<style>'), svg.indexOf('</style>')))
+  }
+  expect(styles.size).toBe(POSES.length)
+  expect(drawingFor('working', true)).toContain('.paw-l{animation:knead')
+  expect(drawingFor('sleeping', true)).toContain('.z{animation:drift')
+})
+
+test('the still picture has no motion and hides the hover heart', () => {
+  for (const pose of POSES) {
+    const svg = drawingFor(pose, false)
+    expect(svg, pose).not.toContain('<style>')
+    expect(svg, pose).toContain('class="heart" opacity="0"')
+  }
 })
 
 test('each mood has a theme colour for its remarks', () => {

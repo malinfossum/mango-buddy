@@ -254,9 +254,10 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const t = await read($, tick)
     const s = await snapshot($, t)
+    const still = await read($, isStill)
     // In still mode the tick can sit on a blink frame (0 % 8), which would draw an awake
     // cat with closed eyes. Nudge by two so the tail and the z keep their parity.
-    const drawTick = (await read($, isStill)) && t % 8 === 0 ? t + 2 : t
+    const drawTick = still && t % 8 === 0 ? t + 2 : t
     const said = await read($, remark)
     const muted = await read($, isMuted)
     const pose = e.props.isWorking ? 'working' : resolveMood(s)
@@ -275,13 +276,15 @@ export const register: Register = on => {
       </>
     )
     if (e.surface !== 'terminal') {
-      // Surfaces that draw an Svg get the picture; a short band gets it at half size.
+      // Surfaces that draw an Svg get the picture; a short band gets it at half size. The
+      // markup follows the pose, never the tick, so her animations run on between periods.
+      // An interactive frame is what lets CSS motion and hover play; still mode is an image.
       const { Svg } = $.ui.resolve(e)
       const scale = isShort ? 0.5 : 1
       return (
         <Box alignItems="center">
           <Box key="cat">
-            <Svg source={drawingFor(pose, drawTick)} alt={altFor(pose)} width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} />
+            <Svg source={drawingFor(pose, !still)} alt={altFor(pose)} width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} isInteractive={!still} />
           </Box>
           {speech}
         </Box>

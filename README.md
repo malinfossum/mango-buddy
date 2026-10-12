@@ -62,6 +62,7 @@ Say `y` to add the marketplace, then pick **user** scope so she follows you into
 
 - **She never phones home.** No network, no model calls, no telemetry, no dependencies.
 - **She dresses for the room.** In the terminal she is plain ASCII, so she fits any terminal. In the desktop Code tab she is a little drawing of the real Mango.
+- **She is alive on desktop.** She breathes, blinks, twitches an ear and swishes her tail, and each mood moves in its own way. Rest your pointer on her and she perks up. She holds still when your system asks for reduced motion.
 - **She speaks in your colours.** Her remarks use your theme's colours, so they stay readable in light and dark.
 - **She makes room.** On a narrow or short band she curls up into a single line.
 - **She works everywhere.** The terminal and the desktop Code tab alike.
