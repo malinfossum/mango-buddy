@@ -51,6 +51,24 @@ export const faceFor = (pose: Pose, tick: number): string => {
   }
 }
 
+// The theme colour a remark is drawn in, by the pose Mango shows. Theme keys follow the
+// person's theme, so these stay readable in light and dark.
+export const toneFor = (pose: Pose): string => {
+  switch (pose) {
+    case 'proud':
+      return 'success'
+    case 'ruffled':
+      return 'error'
+    case 'worried':
+      return 'warning'
+    case 'sleeping':
+      return 'suggestion'
+    case 'awake':
+    case 'working':
+      return 'claude'
+  }
+}
+
 // Awake has no lines: an awake cat shows the context figure instead.
 type Voice = Exclude<Mood, 'awake'> | 'purr' | 'yawn'
 

@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 import type { Mood } from '../types'
-import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS } from './cat'
+import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS, toneFor } from './cat'
+import { altFor, DRAWING_HEIGHT, DRAWING_WIDTH, drawingFor } from './drawing'
 
 type EngineType = EngineInterface
 
@@ -264,13 +265,28 @@ export const register: Register = on => {
     // the art draws the art with an empty line, never a negative slice.
     const room = Math.max(0, e.props.bodyColumns - (isShort ? FACE_WIDTH : ART_WIDTH) - GAP)
     const text = (said ?? `context ${s.contextPercent} %`).slice(0, room)
+    // A remark takes the mood's theme colour; the context figure stays dim.
+    const tone = said === null ? {} : { color: toneFor(pose) }
     const speech = muted ? null : (
       <>
         <Text>{' '.repeat(GAP)}</Text>
         {/* Text has no `key` prop, so the key lives on the Box around it. */}
-        <Box key="line"><Text dimColor={said === null}>{text}</Text></Box>
+        <Box key="line"><Text dimColor={said === null} {...tone}>{text}</Text></Box>
       </>
     )
+    if (e.surface !== 'terminal') {
+      // Surfaces that draw an Svg get the picture; a short band gets it at half size.
+      const { Svg } = $.ui.resolve(e)
+      const scale = isShort ? 0.5 : 1
+      return (
+        <Box alignItems="center">
+          <Box key="cat">
+            <Svg source={drawingFor(pose, drawTick)} alt={altFor(pose)} width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} />
+          </Box>
+          {speech}
+        </Box>
+      )
+    }
     if (isShort) {
       return (
         <Box>

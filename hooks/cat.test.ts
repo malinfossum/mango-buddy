@@ -1,5 +1,6 @@
 import { expect, test } from 'claude-code/testing'
-import { faceFor, frameFor, isTestCommand, remarkFor, resolveMood } from './cat'
+import { faceFor, frameFor, isTestCommand, remarkFor, resolveMood, toneFor } from './cat'
+import { altFor, drawingFor } from './drawing'
 
 test('frames are two rows of exactly ten columns for every pose and tick', () => {
   const poses = ['awake', 'sleeping', 'ruffled', 'proud', 'worried', 'working'] as const
@@ -58,4 +59,35 @@ test('resolveMood: timed moods beat worried, worried beats awake and sleeping', 
   expect(resolveMood({ ...base, tick: 170, lastActivityTick: 9 })).toBe('sleeping')
   expect(resolveMood({ ...base, tick: 170, lastActivityTick: 9, contextPercent: 30 })).toBe('worried')
   expect(resolveMood({ ...base, tick: 169, lastActivityTick: 10 })).toBe('awake')
+})
+
+const POSES = ['awake', 'sleeping', 'ruffled', 'proud', 'worried', 'working'] as const
+
+test('every pose draws a self-contained svg with its own alt text', () => {
+  const alts = new Set<string>()
+  for (const pose of POSES) {
+    const svg = drawingFor(pose, 1)
+    expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"'), pose).toBe(true)
+    expect(svg.endsWith('</svg>'), pose).toBe(true)
+    expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=/i)
+    expect(svg).toMatch(/^[ -~]+$/)
+    alts.add(altFor(pose))
+  }
+  expect(alts.size).toBe(POSES.length)
+})
+
+test('the picture blinks on every eighth tick, swishes on odd ticks and kneads in turn', () => {
+  expect(drawingFor('awake', 8)).not.toBe(drawingFor('awake', 16 + 2))
+  expect(drawingFor('awake', 1)).not.toBe(drawingFor('awake', 2))
+  expect(drawingFor('working', 0)).not.toBe(drawingFor('working', 1))
+  expect(drawingFor('working', 0)).toBe(drawingFor('working', 2))
+  expect(drawingFor('proud', 0)).toBe(drawingFor('proud', 1))
+})
+
+test('each mood has a theme colour for its remarks', () => {
+  expect(toneFor('proud')).toBe('success')
+  expect(toneFor('ruffled')).toBe('error')
+  expect(toneFor('worried')).toBe('warning')
+  expect(toneFor('sleeping')).toBe('suggestion')
+  expect(toneFor('awake')).toBe('claude')
 })
