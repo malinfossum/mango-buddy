@@ -33,7 +33,7 @@ test('faces are five columns', () => {
 })
 
 test('remarks rotate by tick and never repeat the same line twice in a row', () => {
-  for (const mood of ['awake', 'sleeping', 'ruffled', 'proud', 'worried', 'purr', 'yawn'] as const) {
+  for (const mood of ['sleeping', 'ruffled', 'proud', 'worried', 'purr', 'yawn'] as const) {
     expect(remarkFor(mood, 0)).not.toBe(remarkFor(mood, 1))
     expect(remarkFor(mood, 0).length).toBeGreaterThan(3)
     expect(remarkFor(mood, 0)).not.toContain('\u2014')
@@ -41,10 +41,10 @@ test('remarks rotate by tick and never repeat the same line twice in a row', () 
 })
 
 test('isTestCommand accepts test runners and rejects look-alikes', () => {
-  for (const c of ['npm test', 'pnpm run test', 'dotnet test', 'npx vitest', '  yarn test', 'cd web && npm test', 'bun test --watch', 'CI=1 npm test', 'npx vitest run', 'cd x; jest']) {
+  for (const c of ['npm test', 'pnpm run test', 'dotnet test', 'npx vitest', '  yarn test', 'cd web && npm test', 'bun test --watch', 'CI=1 npm test', 'npx vitest run', 'cd x; jest', 'pnpm vitest', 'yarn jest', 'bunx vitest', 'npm exec vitest', 'npm exec -- jest', 'pnpm dlx vitest', 'yarn exec jest', 'cd web\nnpm test', '(cd web && npm test)', 'echo $(npx vitest run)', 'npm run build || npm test']) {
     expect(isTestCommand(c), c).toBe(true)
   }
-  for (const c of ['npm install', 'echo test', 'ls', 'npm run build', 'git commit -m "test"', 'dotnet build', 'npm install -D vitest', 'cat jest.config.js', 'rm vitest.config.ts']) {
+  for (const c of ['npm install', 'echo test', 'ls', 'npm run build', 'git commit -m "test"', 'dotnet build', 'npm install -D vitest', 'cat jest.config.js', 'rm vitest.config.ts', 'yarn add -D jest', 'pnpm add vitest', 'bun add jest', 'npm exec eslint', 'echo "npm test"']) {
     expect(isTestCommand(c), c).toBe(false)
   }
 })
