@@ -517,3 +517,36 @@ test('a failing toast does not skip the budget bookkeeping', async ($, on) => {
   await $.turn.complete({ ...TURN, turnId: 't2' })
   expect(toasts).toBe(1)
 })
+
+test('a failed /mango registration still starts the clock', async ($, on) => {
+  const clock = mock.clock(on)
+  mock.store(on)
+  on('session.start', (_$, e) => ({ cwd: e.cwd }))
+  on('command.register', () => { throw new Error('register down') })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const before = (await ui.find({ key: 'row2' }))?.text
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ key: 'row2' }))?.text).not.toBe(before)
+})
+
+test('a failed clock period is skipped and the next one still ticks', async ($, on) => {
+  const clock = mock.clock(on)
+  mock.store(on)
+  answerStart(on)
+  let failNext = false
+  on('state.get', (_$, e, next) => {
+    if (failNext && e.key === 'moodUntil') {
+      failNext = false
+      throw new Error('state down')
+    }
+    return next(e)
+  })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect((await ui.find({ key: 'row2' }))?.text).toMatch(/^\( -\.- \)/)
+  failNext = true
+  await clock.advance(TICK_MS * 2)
+  expect(failNext).toBe(false)
+  expect((await ui.find({ key: 'row2' }))?.text).toMatch(/^\( o\.o \)/)
+})

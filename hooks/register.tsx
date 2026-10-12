@@ -160,21 +160,23 @@ const readContextPercent = async ($: EngineType): Promise<number | undefined> =>
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    // The command and the clock come first: a failing store read must not leave /mango
-    // unregistered or Mango frozen.
-    await $.command.register({
-      name: 'mango',
-      description: 'Pet Mango, or tell her to be still, quiet or away.',
-      argumentHint: 'pet | mute | unmute | still | move | off | on | card',
-    })
+    // The clock and the command come first: a failing store read must not leave Mango
+    // frozen or /mango unregistered. The clock goes first of all, so a failed
+    // registration still leaves her moving.
     clockTick = await read($, tick)
     clock?.cancel()
     clock = $.clock.every(TICK_MS, async () => {
       try {
         await advanceClock($)
       } catch {
-        // a failed read or write skips this period; the next one tries again
+        // The engine asks the next period either way and never awaits this promise, so
+        // the catch only keeps a failed read or write from becoming an unhandled rejection.
       }
+    })
+    await $.command.register({
+      name: 'mango',
+      description: 'Pet Mango, or tell her to be still, quiet or away.',
+      argumentHint: 'pet | mute | unmute | still | move | off | on | card',
     })
 
     const storedOff = flag(await $.store.get('isOff'))
@@ -224,11 +226,8 @@ export const register: Register = on => {
         const over = rounded >= BUDGET_PERCENT
         const was = await read($, wasOverBudget)
         if (over && !was) {
-          try {
-            $.ui.toast(`Mango: context passed ${BUDGET_PERCENT} %`)
-          } catch {
-            // a failed toast must not skip the bookkeeping below
-          }
+          // Fire and forget: a failed toast fails in its own dispatch, never here.
+          $.ui.toast(`Mango: context passed ${BUDGET_PERCENT} %`)
           await update($, remark, () => remarkFor('worried', clockTick))
         }
         if (!over && was) await update($, remark, () => null)

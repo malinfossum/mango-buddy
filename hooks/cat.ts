@@ -51,8 +51,10 @@ export const faceFor = (pose: Pose, tick: number): string => {
   }
 }
 
-const REMARKS: Record<Mood | 'purr' | 'yawn', readonly string[]> = {
-  awake: ['Mango is watching.', 'Mango sits on the keyboard, just a little.', 'Mango blinks slowly at you.', 'Mango approves of this tab.', 'Mango is here.'],
+// Awake has no lines: an awake cat shows the context figure instead.
+type Voice = Exclude<Mood, 'awake'> | 'purr' | 'yawn'
+
+const REMARKS: Record<Voice, readonly string[]> = {
   sleeping: ['Mango is asleep. Type gently.', 'Mango dreams of warm laptops.', 'Mango curls up on the prompt.', 'Mango is off duty.'],
   ruffled: ['Mango did not like that one.', 'Mango flattens her ears.', 'Mango knocks the error off the table.', 'Mango stares at the stack trace.', 'Mango will allow one retry.'],
   proud: ['Mango purrs at the green run.', 'Mango knew you would get it.', 'Mango stretches. Tests pass.', 'Mango sits taller now.', 'Mango is pleased.'],
@@ -61,15 +63,16 @@ const REMARKS: Record<Mood | 'purr' | 'yawn', readonly string[]> = {
   yawn: ['Mango yawns. That was a long one.', 'Mango checks the clock. Still here.', 'Mango stretches after the long turn.', 'Mango wonders if you need a break too.'],
 }
 
-export const remarkFor = (mood: Mood | 'purr' | 'yawn', tick: number): string => {
+export const remarkFor = (mood: Voice, tick: number): string => {
   const lines = REMARKS[mood]
   return lines[Math.abs(tick) % lines.length] ?? ''
 }
 
-// A runner counts only at command position: the start of the line, or after &&, ; or |,
-// with optional VAR=value prefixes. So `npm install -D vitest` and `cat jest.config.js` do not.
+// A runner counts only at command position: the start of a line, or after &&, ;, |, ( or a
+// backtick, with optional VAR=value prefixes. So `npm install -D vitest` and
+// `cat jest.config.js` do not.
 const TEST_COMMAND =
-  /(^|&&|;|\|)\s*(\w+=\S*\s+)*((npm|pnpm|yarn|bun)\s+(run\s+)?test|(npx\s+|pnpm\s+exec\s+)?(vitest|jest)|dotnet\s+test)\b/
+  /(^|&&|;|\||\n|\(|`)\s*(\w+=\S*\s+)*((npm|pnpm|yarn|bun)\s+(run\s+)?test|((npx|bunx|bun|npm\s+exec(\s+--)?|pnpm(\s+(exec|dlx))?|yarn(\s+(exec|dlx))?)\s+)?(vitest|jest)|dotnet\s+test)\b/
 
 export const isTestCommand = (command: string): boolean => TEST_COMMAND.test(command.trim())
 
