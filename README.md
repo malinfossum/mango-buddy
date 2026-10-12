@@ -61,7 +61,8 @@ Say `y` to add the marketplace, then pick **user** scope so she follows you into
 ## <img src="assets/icons/leaf.svg" width="22" height="22" alt=""> Gentle by design
 
 - **She never phones home.** No network, no model calls, no telemetry, no dependencies.
-- **She is made of text.** Her art is plain ASCII, so she fits any terminal.
+- **She dresses for the room.** In the terminal she is plain ASCII, so she fits any terminal. In the desktop Code tab she is a little drawing of the real Mango.
+- **She speaks in your colours.** Her remarks use your theme's colours, so they stay readable in light and dark.
 - **She makes room.** On a narrow or short band she curls up into a single line.
 - **She works everywhere.** The terminal and the desktop Code tab alike.
 
