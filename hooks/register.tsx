@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 import type { Mood } from '../types'
-import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS } from './cat'
+import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS, toneFor } from './cat'
+import { altFor, DRAWING_HEIGHT, DRAWING_WIDTH, drawingFor } from './drawing'
 
 type EngineType = EngineInterface
 
@@ -253,9 +254,10 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const t = await read($, tick)
     const s = await snapshot($, t)
+    const still = await read($, isStill)
     // In still mode the tick can sit on a blink frame (0 % 8), which would draw an awake
     // cat with closed eyes. Nudge by two so the tail and the z keep their parity.
-    const drawTick = (await read($, isStill)) && t % 8 === 0 ? t + 2 : t
+    const drawTick = still && t % 8 === 0 ? t + 2 : t
     const said = await read($, remark)
     const muted = await read($, isMuted)
     const pose = e.props.isWorking ? 'working' : resolveMood(s)
@@ -264,13 +266,30 @@ export const register: Register = on => {
     // the art draws the art with an empty line, never a negative slice.
     const room = Math.max(0, e.props.bodyColumns - (isShort ? FACE_WIDTH : ART_WIDTH) - GAP)
     const text = (said ?? `context ${s.contextPercent} %`).slice(0, room)
+    // A remark takes the mood's theme colour; the context figure stays dim.
+    const tone = said === null ? {} : { color: toneFor(pose) }
     const speech = muted ? null : (
       <>
         <Text>{' '.repeat(GAP)}</Text>
         {/* Text has no `key` prop, so the key lives on the Box around it. */}
-        <Box key="line"><Text dimColor={said === null}>{text}</Text></Box>
+        <Box key="line"><Text dimColor={said === null} {...tone}>{text}</Text></Box>
       </>
     )
+    if (e.surface !== 'terminal') {
+      // Surfaces that draw an Svg get the picture; a short band gets it at half size. The
+      // markup follows the pose, never the tick, so her animations run on between periods.
+      // An interactive frame is what lets CSS motion and hover play; still mode is an image.
+      const { Svg } = $.ui.resolve(e)
+      const scale = isShort ? 0.5 : 1
+      return (
+        <Box alignItems="center">
+          <Box key="cat">
+            <Svg source={drawingFor(pose, !still)} alt={altFor(pose)} width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} isInteractive={!still} />
+          </Box>
+          {speech}
+        </Box>
+      )
+    }
     if (isShort) {
       return (
         <Box>

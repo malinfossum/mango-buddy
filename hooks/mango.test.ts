@@ -3,8 +3,6 @@ import type { TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
 import { TICK_MS, SLEEP_AFTER_TICKS, RUFFLED_TICKS, PROUD_TICKS, remarkFor } from './cat'
 
-export const SURFACES = ['terminal', 'desktop'] as const
-
 export const BAND = {
   hasSurvey: false,
   isWorking: false,
@@ -14,14 +12,85 @@ export const BAND = {
   view: {},
 }
 
-test('draws two rows of cat and a line on both surfaces', async ($, on) => {
+test('the terminal draws two rows of cat and a line', async ($, on) => {
   mock.clock(on)
   mock.store(on)
-  for (const surface of SURFACES) {
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  expect((await ui.find({ key: 'row1' }))?.text?.trimEnd()).toBe(' /\\_/\\')
+  expect((await ui.find({ key: 'row2' }))?.text).toMatch(/^\( [o-]\.[o-] \)/)
+  expect(await ui.find({ key: 'line' })).toBeDefined()
+})
+
+// The mood and time logic is the same on every surface, so the tests below that read the
+// ASCII rows mount on the terminal. These cover what only the picture surfaces draw.
+
+test('the desktop draws a picture of Mango and a line, no ASCII rows', async ($, on) => {
+  mock.clock(on)
+  mock.store(on)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const cat = await ui.find({ type: 'Svg' })
+  expect(String(cat?.props.source)).toMatch(/^<svg /)
+  expect(cat?.props.alt).toBe('Mango, a black cat, is awake.')
+  expect(cat?.props.width).toBe(60)
+  expect(await ui.find({ key: 'row1' })).toBeUndefined()
+  expect(await ui.find({ key: 'line' })).toBeDefined()
+})
+
+test('the desktop picture keeps its markup across ticks and changes with the mood', async ($, on) => {
+  const clock = mock.clock(on)
+  mock.store(on)
+  answerStart(on)
+  on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: 'boom' }, isError: true }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const before = await ui.find({ type: 'Svg' })
+  expect(before?.props.isInteractive).toBe(true)
+  // A changed source would reload the frame and restart her animations.
+  await clock.advance(TICK_MS)
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.source).toBe(before?.props.source)
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'd1' })
+  const after = await ui.find({ type: 'Svg' })
+  expect(after?.props.alt).toBe('Mango, a black cat, is ruffled.')
+  expect(after?.props.source).not.toBe(before?.props.source)
+})
+
+test('still mode draws the desktop picture as a plain image, without motion', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on, { isStill: true })
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.isInteractive).toBe(false)
+  expect(String(cat?.props.source)).not.toContain('<style>')
+})
+
+test('a short desktop band draws the picture at half size', async ($, on) => {
+  mock.clock(on)
+  mock.store(on)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: { ...BAND, maxRows: 2 } })
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.width).toBe(30)
+  expect(cat?.props.height).toBe(24)
+})
+
+test('a remark takes the mood colour and the context figure stays dim', async ($, on) => {
+  mock.clock(on)
+  mock.store(on)
+  answerStart(on)
+  on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: 'boom' }, isError: true }))
+  await $.session.start(START)
+  for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'mango', surface, component: 'AbovePrompt', props: BAND })
-    expect((await ui.find({ key: 'row1' }))?.text?.trimEnd()).toBe(' /\\_/\\')
-    expect((await ui.find({ key: 'row2' }))?.text).toMatch(/^\( [o-]\.[o-] \)/)
-    expect(await ui.find({ key: 'line' })).toBeDefined()
+    const figure = await ui.find({ type: 'Text', text: /^context/ })
+    expect(figure?.props.dimColor).toBe(true)
+    expect(figure?.props.color).toBeUndefined()
+  }
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'd2' })
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ plugin: 'mango', surface, component: 'AbovePrompt', props: BAND })
+    expect((await ui.find({ type: 'Text', text: remarkFor('ruffled', 0) }))?.props.color).toBe('error')
   }
 })
 
@@ -32,7 +101,7 @@ test('the clock ticks and the tail flicks', async ($, on) => {
   mock.store(on)
   answerStart(on)
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   const before = (await ui.find({ key: 'row2' }))?.text
   await clock.advance(TICK_MS)
   const after = (await ui.find({ key: 'row2' }))?.text
@@ -59,7 +128,7 @@ test('still mode stops tick writes but a mood change still redraws', async ($, o
   answerStart(on)
   on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: 'boom' }, isError: true }))
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   const before = await ui.drawn()
   await clock.advance(TICK_MS * 20)
   expect(await ui.drawn()).toEqual(before)
@@ -82,7 +151,7 @@ test('a failed Bash call ruffles Mango and counts an error survived', async ($, 
   answerStart(on)
   on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: 'boom' }, isError: true }))
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'u3' })
   expect((await ui.find({ key: 'row2' }))?.text).toContain('>.<')
   expect((await ui.find({ key: 'line' }))?.text).toMatch(/^Mango/)
@@ -147,7 +216,7 @@ test('crossing 20 % worries Mango and toasts once; dropping below calms her', as
   on('session.usage', () => ({ value: usageAt(percent) }))
   on('ui.toast', (_, e) => { toasts.push(e.text); return { value: undefined } })
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   await $.turn.complete(TURN)
   expect((await ui.find({ key: 'row2' }))?.text).toContain('O.O')
   await $.turn.complete({ ...TURN, turnId: 't2' })
@@ -244,7 +313,7 @@ test('/mango mute keeps the cat and drops the speech line', async ($, on) => {
   const data = memoryStore(on)
   answerStart(on)
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   expect((await run($, 'mute')).text).toBe('Mango is quiet now.')
   expect(data.get('isMuted')).toBe(true)
   expect(await ui.find({ key: 'row2' })).toBeDefined()
@@ -269,7 +338,7 @@ test('stored flags load at session start, and anything but true counts as false'
   memoryStore(on, { isMuted: true, isOff: 'yes' })
   answerStart(on)
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   expect(await ui.find({ key: 'row1' })).toBeDefined()
   expect(await ui.find({ key: 'line' })).toBeUndefined()
 })
@@ -371,7 +440,7 @@ test('a ruffled mood expires and takes its remark with it', async ($, on) => {
   answerStart(on)
   failBash(on)
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'e1' })
   expect((await ui.find({ key: 'row2' }))?.text).toContain('>.<')
   expect((await ui.find({ key: 'line' }))?.text).toMatch(/^Mango/)
@@ -402,7 +471,7 @@ test('still mode: a ruffled mood expires and takes its remark with it', async ($
   answerStart(on)
   failBash(on)
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'e3' })
   expect((await ui.find({ key: 'row2' }))?.text).toContain('>.<')
   await clock.advance(TICK_MS * RUFFLED_TICKS)
@@ -430,7 +499,7 @@ test('falling asleep sets a sleeping remark and a tool call clears it', async ($
   answerStart(on)
   on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: '' } }))
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   await clock.advance(TICK_MS * SLEEP_AFTER_TICKS)
   expect((await ui.find({ key: 'row2' }))?.text).toMatch(/z/)
   expect((await ui.find({ key: 'line' }))?.text).toBe(remarkFor('sleeping', SLEEP_AFTER_TICKS))
@@ -458,7 +527,7 @@ test('still mode: Mango still falls asleep, with her sleeping remark', async ($,
   memoryStore(on, { isStill: true })
   answerStart(on)
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   await clock.advance(TICK_MS * SLEEP_AFTER_TICKS)
   expect((await ui.find({ key: 'row2' }))?.text).toMatch(/z/)
   expect((await ui.find({ key: 'line' }))?.text).toBe(remarkFor('sleeping', SLEEP_AFTER_TICKS))
@@ -469,7 +538,7 @@ test('still mode never draws the blink frame on an awake cat', async ($, on) => 
   memoryStore(on, { isStill: true })
   answerStart(on)
   await $.session.start(START)
-  const wide = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const wide = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   expect((await wide.find({ key: 'row2' }))?.text).toMatch(/^\( o\.o \)/)
   const short = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: { ...BAND, maxRows: 2 } })
   expect((await short.find({ key: 'face' }))?.text).toBe('(o.o)')
@@ -496,7 +565,7 @@ test('a store failure in session.start still registers /mango and starts the clo
   on('store.get', () => { throw new Error('store down') })
   await $.session.start(START)
   expect(registered).toEqual(['mango'])
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   const before = (await ui.find({ key: 'row2' }))?.text
   await clock.advance(TICK_MS)
   expect((await ui.find({ key: 'row2' }))?.text).not.toBe(before)
@@ -524,7 +593,7 @@ test('a failed /mango registration still starts the clock', async ($, on) => {
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('command.register', () => { throw new Error('register down') })
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   const before = (await ui.find({ key: 'row2' }))?.text
   await clock.advance(TICK_MS)
   expect((await ui.find({ key: 'row2' }))?.text).not.toBe(before)
@@ -543,7 +612,7 @@ test('a failed clock period is skipped and the next one still ticks', async ($, 
     return next(e)
   })
   await $.session.start(START)
-  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   expect((await ui.find({ key: 'row2' }))?.text).toMatch(/^\( -\.- \)/)
   failNext = true
   await clock.advance(TICK_MS * 2)
