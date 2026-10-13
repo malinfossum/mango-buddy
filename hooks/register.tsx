@@ -17,6 +17,9 @@ export const wasOverBudget = atom({ plugin: 'mango', key: 'wasOverBudget' } as c
 export const isOff = atom({ plugin: 'mango', key: 'isOff' } as const, false)
 export const isMuted = atom({ plugin: 'mango', key: 'isMuted' } as const, false)
 export const isStill = atom({ plugin: 'mango', key: 'isStill' } as const, false)
+// The mood the picture surfaces draw. They never read the tick, which the clock writes
+// every period: each redraw rebuilds the picture's frame, and that shows as a blink.
+export const shownMood = atom({ plugin: 'mango', key: 'shownMood' } as const, 'awake' as Mood)
 
 const FACE_WIDTH = 5
 
@@ -53,10 +56,19 @@ const clearSleepRemark = async ($: EngineType) => {
   if ((await read($, remark)) === line) await update($, remark, () => null)
 }
 
+// Writes the mood only when it changes, so the picture is redrawn only then.
+const showMood = async ($: EngineType, m: Mood) => {
+  if ((await read($, shownMood)) !== m) await update($, shownMood, () => m)
+}
+
+// Resolves the mood now. Every write outside the clock that can change it calls this.
+const syncShownMood = async ($: EngineType) => showMood($, resolveMood(await snapshot($, clockTick)))
+
 export const markActivity = async ($: EngineType) => {
   const t = clockTick
   await update($, lastActivityTick, () => t)
   await clearSleepRemark($)
+  await syncShownMood($)
 }
 
 // Reads the count, adds one and writes it back at the moment of change.
@@ -116,6 +128,7 @@ const setTimedMood = async ($: EngineType, m: 'ruffled' | 'proud', ticks: number
   const line = remarkFor(m, t)
   timedRemark = line
   await update($, remark, () => line)
+  await syncShownMood($)
 }
 
 // One period of the clock. Normal mode writes the tick every period. Still mode writes
@@ -132,6 +145,7 @@ const advanceClock = async ($: EngineType) => {
     s = { ...s, mood: 'awake' }
   }
   const now = resolveMood(s)
+  await showMood($, now)
   if (await read($, isStill)) {
     const stored = await read($, tick)
     if (now !== resolveMood({ ...s, tick: stored })) await update($, tick, () => t)
@@ -195,6 +209,7 @@ export const register: Register = on => {
       // A resumed session may already be well into its context: show the real figure, no toast.
       const rounded = await readContextPercent($)
       if (rounded !== undefined) await update($, contextPercent, () => rounded)
+      await syncShownMood($)
     } catch {
       // usage unavailable: keep the default
     }
@@ -233,6 +248,7 @@ export const register: Register = on => {
         }
         if (!over && was) await update($, remark, () => null)
         await update($, wasOverBudget, () => over)
+        await syncShownMood($)
       }
     } catch {
       // usage unavailable: keep the previous figure
@@ -252,20 +268,23 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey || (await read($, isOff))) return next(e)
     const { Box, Text } = $.ui.resolve(e)
-    const t = await read($, tick)
-    const s = await snapshot($, t)
+    const isTerminal = e.surface === 'terminal'
+    // Only the terminal reads the tick: its frames change with it. The picture surfaces
+    // read the shown mood, so an idle clock period never redraws them.
+    const t = isTerminal ? await read($, tick) : 0
+    const shown = isTerminal ? resolveMood(await snapshot($, t)) : await read($, shownMood)
     const still = await read($, isStill)
     // In still mode the tick can sit on a blink frame (0 % 8), which would draw an awake
     // cat with closed eyes. Nudge by two so the tail and the z keep their parity.
     const drawTick = still && t % 8 === 0 ? t + 2 : t
     const said = await read($, remark)
     const muted = await read($, isMuted)
-    const pose = e.props.isWorking ? 'working' : resolveMood(s)
+    const pose = e.props.isWorking ? 'working' : shown
     const isShort = e.props.maxRows < 3
     // The face is 5 columns wide, the two-row art ART_WIDTH. A band narrower than
     // the art draws the art with an empty line, never a negative slice.
     const room = Math.max(0, e.props.bodyColumns - (isShort ? FACE_WIDTH : ART_WIDTH) - GAP)
-    const text = (said ?? `context ${s.contextPercent} %`).slice(0, room)
+    const text = (said ?? `context ${await read($, contextPercent)} %`).slice(0, room)
     // A remark takes the mood's theme colour; the context figure stays dim.
     const tone = said === null ? {} : { color: toneFor(pose) }
     const speech = muted ? null : (
@@ -275,7 +294,7 @@ export const register: Register = on => {
         <Box key="line"><Text dimColor={said === null} {...tone}>{text}</Text></Box>
       </>
     )
-    if (e.surface !== 'terminal') {
+    if (!isTerminal) {
       // Surfaces that draw an Svg get the picture; a short band gets it at half size. The
       // markup follows the pose, never the tick, so her animations run on between periods.
       // An interactive frame is what lets CSS motion and hover play; still mode is an image.

@@ -55,6 +55,42 @@ test('the desktop picture keeps its markup across ticks and changes with the moo
   expect(after?.props.source).not.toBe(before?.props.source)
 })
 
+test('an idle desktop band is not redrawn on every tick', async ($, on) => {
+  const clock = mock.clock(on)
+  mock.store(on)
+  answerStart(on)
+  // The engine redraws a band when a value it read while drawing is written. On the
+  // desktop each redraw rebuilds the picture's frame, which shows as a blink.
+  const reads = new Set<string>()
+  const writes = new Set<string>()
+  let phase: 'draw' | 'idle' | null = null
+  on('state.get', (_$, e, next) => { if (phase === 'draw') reads.add(e.key); return next(e) })
+  on('state.set', (_$, e, next) => { if (phase === 'idle') writes.add(e.key); return next(e) })
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  phase = 'draw'
+  await ui.redraw()
+  phase = 'idle'
+  await clock.advance(TICK_MS * 10)
+  phase = null
+  expect(reads.size).toBeGreaterThan(0)
+  expect([...writes].filter(key => reads.has(key))).toEqual([])
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is awake.')
+})
+
+test('the desktop picture falls asleep and a tool call wakes her at once', async ($, on) => {
+  const clock = mock.clock(on)
+  mock.store(on)
+  answerStart(on)
+  on('tool.call', { tool: 'Bash' }, () => ({ result: { stdout: '', stderr: '' } }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  await clock.advance(TICK_MS * SLEEP_AFTER_TICKS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is asleep.')
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'w1' })
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is awake.')
+})
+
 test('still mode draws the desktop picture as a plain image, without motion', async ($, on) => {
   mock.clock(on)
   memoryStore(on, { isStill: true })

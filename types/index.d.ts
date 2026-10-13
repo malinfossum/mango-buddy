@@ -14,6 +14,7 @@ declare module 'claude-code' {
       isOff: boolean
       isMuted: boolean
       isStill: boolean
+      shownMood: Mood
     }
   }
 }
