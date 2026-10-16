@@ -15,10 +15,9 @@
 
 Mango sits in the little band above the prompt and keeps you company while you work. She blinks, flicks her tail and kneads while Claude thinks. She naps when you go quiet, flattens her ears at a failed command, purrs at a green test run and gets a little worried when your context window fills up.
 
-```text
- /\_/\
-( o.o ) ~   Mango blinks slowly at you.
-```
+<p align="center">
+  <img src="assets/bands.svg" alt="Mango in the band above the prompt, twice. In the desktop Code tab she is a little drawing of a black cat with a sparkle, saying: Mango purrs at the green run. In the terminal she is an ASCII cat with flattened ears, saying: Mango knocks the error off the table." width="100%">
+</p>
 
 She is small, she is soft, and she is always there.
 
@@ -27,7 +26,7 @@ She is small, she is soft, and she is always there.
 ## <img src="assets/icons/moon.svg" width="22" height="22" alt=""> Her moods
 
 <p align="center">
-  <img src="assets/moods.svg" alt="Six mood cards. Awake: just being here. Working: kneads while Claude works. Proud: purrs at green test runs. Sleeping: naps when you go quiet. Ruffled: after a failed command. Worried: when context passes 20 percent." width="100%">
+  <img src="assets/moods.svg" alt="Six mood cards, each with her terminal face and her desktop drawing. Awake: just being here. Working: kneads while Claude works. Proud: purrs at green test runs. Sleeping: naps when you go quiet. Ruffled: after a failed command. Worried: when context passes 20 percent." width="100%">
 </p>
 
 Every mood comes with something to say, like *"Mango knocks the error off the table."* or *"Mango dreams of warm laptops."* Pet her and she leans into your hand.
