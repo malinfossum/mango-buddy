@@ -97,3 +97,34 @@ test('a pounce or a chase plays once, after the walk to the middle', () => {
   expect(still).not.toContain('pounce')
   expect(still).toContain('<g class="spot" transform="translate(120 0)">')
 })
+
+test('walking shows the side view while she moves, facing her way, then the front again', () => {
+  const right = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'peering', from: 'middle', to: 'right' })
+  expect(right).toContain('<g class="side-r" opacity="0">')
+  expect(right).toContain('<g class="side-l" opacity="0"><g transform="translate(120 0) scale(-1 1)">')
+  expect(right).toContain('.side-r{animation:shown 1.2s linear 0s}')
+  expect(right).toContain('.front{animation:hidden 1.2s linear 0s}')
+  expect(right).not.toContain('.side-l{animation')
+  expect(right).not.toContain('slide-bob 0.3s')
+  const left = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'sniffing', from: 'middle', to: 'left' })
+  expect(left).toContain('.side-l{animation:shown 1.2s linear 0s}')
+  expect(left).not.toContain('.side-r{animation')
+})
+
+test('a walking chase runs right, turns and comes back', () => {
+  const chase = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'chasing' })
+  expect(chase).toContain('.side-r{animation:shown 0.6s linear 0s}')
+  expect(chase).toContain('.side-l{animation:shown 0.6s linear 0.6s}')
+  expect(chase).toContain('.front{animation:hidden 0.6s linear 0s,hidden 0.6s linear 0.6s}')
+  const after = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'chasing', from: 'left' })
+  expect(after).toContain('.side-r{animation:shown 1.2s linear 0s,shown 0.6s linear 1.2s}')
+  expect(after).toContain('.side-l{animation:shown 0.6s linear 1.8s}')
+})
+
+test('only a walk that moves or chases draws the side view', () => {
+  const moving = { ...BASE, activity: 'peering', from: 'middle', to: 'right' } as const
+  expect(stageFor({ ...moving, gait: 'slide', motion: 'always' })).not.toContain('class="side-')
+  expect(stageFor({ ...moving, gait: 'walk', motion: 'never' })).not.toContain('class="side-')
+  expect(stageFor({ ...BASE, gait: 'walk', motion: 'always' })).not.toContain('class="side-')
+  expect(stageFor({ ...moving, gait: 'walk', motion: 'auto' })).toContain('prefers-reduced-motion:reduce')
+})
