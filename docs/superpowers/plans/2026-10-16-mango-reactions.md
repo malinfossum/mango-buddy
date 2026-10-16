@@ -35,18 +35,67 @@
 
 ---
 
-### Task 1: Probe whether a picture swap flashes (Malin, by hand)
+### Task 1: Probe the hover heart over an image (Malin, by hand)
 
-The spec makes this the first task: activities swap the desktop picture far more often than moods do. If a swap flashes, everything after this task is built on the wrong base.
+The swap probe is done (2026-10-16): a frame (`isInteractive: true`) blinks on every new source, and an image moves and swaps with no blink. So the stage is always an image, and the hover heart moves to its own picture in an absolute Box that a hover shows. This task checks that layering on the desktop before anything is built on it. All code here is throwaway.
 
 **Files:**
+- Throwaway, on branch `spike/hover-heart`: `hooks/register.tsx`
 - Modify: `C:\Users\Nugget\.claude\projects\C--Users-Nugget-Documents-Development-GitHub-repos-mango-buddy\memory\reactions-design.md` (record the result)
 
 **Interfaces:**
-- Consumes: the installed plugin (v0.1.3).
-- Produces: a recorded yes or no. No code.
+- Consumes: v1 `hooks/register.tsx` and `drawingFor`.
+- Produces: a recorded yes or no. No code is kept.
 
-- [ ] **Step 1: Find the copy the engine loads**
+- [ ] **Step 1: Build the probe on a throwaway branch**
+
+```bash
+git checkout -b spike/hover-heart
+```
+
+In `hooks/register.tsx`, in the desktop branch of the `ui.render` hook, replace the `<Box key="cat">...</Box>` element with:
+
+```tsx
+          <Box key="cat">
+            <Svg source={drawingFor(pose, !still)} alt={altFor(pose)} width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} isInteractive={false} />
+            {/* SPIKE: the hover heart as its own image over Mango. Throwaway. */}
+            <Box position="absolute" top={0} left={0} display="none" hover={{ display: 'flex' }}>
+              <Svg source={PROBE_HEART} alt="A heart floats over Mango." width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} isInteractive={false} />
+            </Box>
+          </Box>
+```
+
+and add above the `register` function:
+
+```ts
+// SPIKE: the v1 heart alone on the 120 x 96 grid, floating. No reduced-motion query, so
+// it floats on Malin's system too. Throwaway.
+const PROBE_HEART = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 96" width="120" height="96"><style>@keyframes love{0%{opacity:0;transform:translateY(4px) scale(0.6)}25%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-8px) scale(1)}}.heart{transform-origin:90px 16px;animation:love 1.8s ease-out infinite}</style><path class="heart" d="M 96 14 C 96 10 91 9 90 13 C 89 9 84 10 84 14 C 84 18 90 21 90 23 C 90 21 96 18 96 14 Z" fill="#e5484d"/></svg>'
+```
+
+The heart Box has no `key`: a hover applies while the pointer is over the nearest keyed Box, which here is `cat`, so the pointer on Mango shows it.
+
+Run: `npx -p typescript tsc -p . --noEmit`
+Expected: tsc prints nothing. Then commit, because the install copies a commit:
+
+```bash
+git add hooks/register.tsx
+git commit -m "Spike: hover heart as its own image over Mango (throwaway)"
+```
+
+- [ ] **Step 2: Reinstall from the folder**
+
+From the repo folder:
+
+```bash
+mkdir -p /tmp/mango-store-backup && cp "$USERPROFILE"/.claude/plugins/store/mango_mango-buddy-*.json /tmp/mango-store-backup/
+claude plugin uninstall mango@mango-buddy --keep-data
+claude plugin install mango@mango-buddy
+```
+
+Do not trust `/reload-plugins` or the "nothing to update" line of `claude plugin update`.
+
+- [ ] **Step 3: Find the copy the engine loads**
 
 The engine runs a cached copy, not the repo folder (project memory, cache trap).
 
@@ -54,11 +103,11 @@ The engine runs a cached copy, not the repo folder (project memory, cache trap).
 grep -n -A10 '"mango@mango-buddy"' "$USERPROFILE/.claude/plugins/installed_plugins.json"
 ```
 
-Note `installPath` and `gitCommitSha`.
+Note `installPath` and `gitCommitSha`. The SHA must be the commit just made (`git rev-parse HEAD`).
 
-- [ ] **Step 2: Check the cache matches the repo's hooks**
+- [ ] **Step 4: Check the cache matches the repo's hooks**
 
-Fill in the two values from Step 1 (use forward slashes in the path):
+Fill in the two values from Step 3 (use forward slashes in the path):
 
 ```bash
 SHA=<gitCommitSha>
@@ -69,41 +118,37 @@ done
 git diff --quiet "$SHA" HEAD -- hooks && echo "hooks unchanged since $SHA"
 ```
 
-Expected: five `same` lines and `hooks unchanged since ...`.
+Expected: five `same` lines and `hooks unchanged since ...`. Also check the store file is still in `$USERPROFILE/.claude/plugins/store/`.
 
-- [ ] **Step 3: Reinstall only if Step 2 showed a difference**
+- [ ] **Step 5: Ask Malin to check the heart in a NEW session**
 
-Skip this step when every file is the same. Otherwise run, from the repo folder:
+Guide her one step at a time and wait for each answer (she is new to probes):
+
+1. Open a new Code-tab session (any folder) and find Mango in the band above the chat box.
+2. Rest the mouse pointer on Mango. Does a red heart show beside her head, top right, and float up?
+3. Move the pointer away. Does the heart go away?
+4. Did anything blink, jump or shift when the heart came or went?
+
+Her Windows animation effects stay off. Mango herself looks still on her system; the probe heart floats anyway because it has no reduced-motion query.
+
+- [ ] **Step 6: Put her normal Mango back**
 
 ```bash
-mkdir -p /tmp/mango-store-backup && cp "$USERPROFILE"/.claude/plugins/store/mango_mango-buddy-*.json /tmp/mango-store-backup/
-claude plugin uninstall mango@mango-buddy --keep-data
-claude plugin install mango@mango-buddy
+git checkout feat/reactions
 ```
 
-Then repeat Steps 1 and 2. Do not trust `/reload-plugins` or the "nothing to update" line of `claude plugin update`.
+Reinstall as in Step 2, then repeat Steps 3 and 4 with the SHA now the head of `feat/reactions`, and check `grep -c SPIKE "<installPath>/hooks/register.tsx"` prints `0`. Then delete the branch (never pushed):
 
-- [ ] **Step 4: Ask Malin to run the probe in a NEW session**
-
-A running session keeps the code it loaded, so the check needs a fresh one. In v1 the working pose beats ruffled and ruffled lasts only 6 s, so a turn that runs on after the failing command may never show ruffled. The probe therefore has a part she drives herself: in v1, `/mango still` and `/mango move` swap the picture's source with no turn running. Send her this, ready to paste:
-
-```text
-Probe for Mango, please (about 3 minutes):
-1. Open a NEW session in the desktop Code tab (any folder).
-2. Type /mango still and watch the band. Then type /mango move and watch again. Each one swaps her picture.
-3. Paste this prompt: Run the Bash command `exit 1`, then reply with one word.
-   Watch the band when the turn starts (awake to working), when it ends (working to ruffled or awake), and a few seconds later (ruffled to awake).
-4. Tell me for each swap: did the band flash, go blank, go white or jump? A plain change of picture is fine.
+```bash
+git branch -D spike/hover-heart
 ```
 
-Her Windows animation effects stay off. Mango looks still on her system, and that is fine: the probe is about the picture swap, not about motion.
+- [ ] **Step 7: Record the answer and decide**
 
-- [ ] **Step 5: Record the answer and decide**
+Write one dated line under a new `**Hover probe (date):**` heading in `reactions-design.md` with her words.
 
-Write one dated line under a new `**Swap probe (2026-10-16 or the day it ran):**` heading in `reactions-design.md` with her words.
-
-- No flash at any moment: tick this task and go on to Task 2.
-- A flash at any moment: **stop here.** Do not start Task 2. Tell Malin, and take the design back to brainstorming with what she saw. The plan below assumes swaps do not flash.
+- The heart shows on hover, sits beside her head, floats, goes away and nothing jumps: tick this task and go on to Task 2.
+- Anything else: **stop here.** Do not start Task 2. Tell Malin what she saw and offer the spec's fallback (drop hover for now) or a new probe. The plan below assumes the overlay works.
 
 ---
 
@@ -715,7 +760,7 @@ git commit -m "Give each activity its own terminal rows and face"
 
 **Interfaces:**
 - Consumes: `Look`, `Pose` from `hooks/cat.ts`; `Activity` from `types/index.d.ts`; `ACTIVITIES` from `hooks/activity.ts` (tests only).
-- Produces in `hooks/drawing.ts`: exported palette `COAT`, `RIM`, `EAR`, `WHITE`, `AMBER`, `PUPIL`, `NOSE`; `DEFS`; `REDUCED`; `tailStrokes(d: string): string`; `frontView(look: Look, isAnimated: boolean): string` (the drawing's inner markup, no `<svg>` and no style); `frontStyle(look: Look): string` (keyframes, origins, the look's motion, hover; no reduced-motion query); `altFor(pose: Pose, activity?: Activity | null): string`. `drawingFor(pose, isAnimated)` keeps its exact output.
+- Produces in `hooks/drawing.ts`: exported palette `COAT`, `RIM`, `EAR`, `WHITE`, `AMBER`, `PUPIL`, `NOSE`, `HEART`; `DEFS`; `REDUCED`; `HEART_PATH` (the heart's path data); `LOVE` (the heart's float keyframes); `tailStrokes(d: string): string`; `frontView(look: Look, isAnimated: boolean): string` (the drawing's inner markup, no `<svg>`, no style and no heart); `frontStyle(look: Look): string` (keyframes, origins, the look's motion; no hover and no reduced-motion query); `altFor(pose: Pose, activity?: Activity | null): string`. `drawingFor(pose, isAnimated)` keeps its exact output.
 
 `drawing.ts` must keep importing types only: the harness scripts import it straight into Node, which cannot resolve suffix-less value imports.
 
@@ -771,6 +816,8 @@ test('every look moves in its own way', () => {
   for (const look of LOOKS) {
     expect(frontStyle(look), look).toMatch(/@keyframes/)
     expect(frontStyle(look), look).not.toContain('prefers-reduced-motion')
+    // The stage is drawn as an image, which gets no :hover; the heart is its own picture.
+    expect(frontStyle(look), look).not.toContain(':hover')
   }
 })
 
@@ -780,7 +827,7 @@ test('the activities show in the still picture too', () => {
       const view = frontView(look, isAnimated)
       expect(view, look).toMatch(/^[ -~]+$/)
       expect(view, look).not.toMatch(/<svg|<style|<script|<image|href=|on[a-z]+=/i)
-      expect(view, look).toContain('class="heart" opacity="0"')
+      expect(view, look).not.toContain('class="heart"')
     }
   }
   expect(frontView('sniffing', false)).toContain('<g transform="translate(0 5)"><g class="head">')
@@ -806,7 +853,22 @@ import type { Activity } from '../types'
 import type { Look, Pose } from './cat'
 ```
 
-2. Put `export` in front of `const COAT`, `RIM`, `EAR`, `WHITE`, `AMBER`, `PUPIL`, `NOSE`, `DEFS` and `REDUCED`.
+2. Put `export` in front of `const COAT`, `RIM`, `EAR`, `WHITE`, `AMBER`, `PUPIL`, `NOSE`, `HEART`, `DEFS` and `REDUCED`. Then export the heart's parts for the stage's hover heart, keeping every string byte for byte. Replace the `heart` constant with:
+
+```ts
+export const HEART_PATH = 'M 96 14 C 96 10 91 9 90 13 C 89 9 84 10 84 14 C 84 18 90 21 90 23 C 90 21 96 18 96 14 Z'
+
+// Shown only while a pointer rests on her. Hidden by its own attribute, so a picture
+// without the style sheet never shows it.
+const heart = `<path class="heart" opacity="0" d="${HEART_PATH}" fill="${HEART}"/>`
+```
+
+and in `KEYFRAMES` replace the `'@keyframes love{...}'` line with `LOVE,`, declared above `KEYFRAMES` as:
+
+```ts
+// The heart's float, shared with the stage's hover heart.
+export const LOVE = '@keyframes love{0%{opacity:0;transform:translateY(4px) scale(0.6)}25%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-8px) scale(1)}}'
+```
 
 3. Replace `tail` with:
 
@@ -905,11 +967,13 @@ const LOOK_KEYFRAMES = [
 9. Replace `styleFor`, `altFor` and `drawingFor` with:
 
 ```ts
-// A look's style for the stage: everything but the reduced-motion query, which the
-// stage adds or leaves out by the motion setting.
-export const frontStyle = (look: Look): string => `${KEYFRAMES}${LOOK_KEYFRAMES}${ORIGINS}${motionFor(look)}${HOVER}`
+// A look's style for the stage: everything but hover, which a picture drawn as an image
+// never gets, and the reduced-motion query, which the stage adds or leaves out by the
+// motion setting.
+export const frontStyle = (look: Look): string => `${KEYFRAMES}${LOOK_KEYFRAMES}${ORIGINS}${motionFor(look)}`
 
-// The front view's markup on the 120 x 96 grid, without the <svg> around it or a style.
+// The front view's markup on the 120 x 96 grid, without the <svg> around it, a style or
+// the heart (the stage draws its hover heart as a picture of its own).
 // Sniffing lowers her head; everything else about a look is in its eyes, ears and motion.
 export const frontView = (look: Look, isAnimated: boolean): string => {
   const headGroup = `<g class="head">${ears(earsFor(look))}${head}${ruff}${eyes(eyesFor(look))}${face}</g>`
@@ -918,8 +982,7 @@ export const frontView = (look: Look, isAnimated: boolean): string => {
     body +
     paws +
     (look === 'sniffing' ? `<g transform="translate(0 5)">${headGroup}</g>` : headGroup) +
-    mark(look, isAnimated) +
-    heart
+    mark(look, isAnimated)
   )
 }
 
@@ -958,12 +1021,13 @@ export const altFor = (pose: Pose, activity: Activity | null = null): string => 
   }
 }
 
-// The single drawing, as the README art and v1 drew it.
+// The single drawing, as the README art and v1 drew it, heart and hover included.
 export const drawingFor = (pose: Pose, isAnimated: boolean): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 96" width="120" height="96">` +
   DEFS +
   (isAnimated ? `<style>${KEYFRAMES}${ORIGINS}${motionFor(pose)}${HOVER}${REDUCED}</style>` : '') +
   frontView(pose, isAnimated) +
+  heart +
   `</svg>`
 ```
 
@@ -986,21 +1050,21 @@ git commit -m "Give Mango's front view a look for each activity"
 
 ---
 
-### Task 6: The stage, with the slide gait
+### Task 6: The stage and its hover heart, with the slide gait
 
 **Files:**
 - Create: `hooks/stage.ts`
 - Test: `hooks/stage.test.ts`
 
 **Interfaces:**
-- Consumes: `frontView`, `frontStyle`, `DEFS`, `REDUCED` from `hooks/drawing.ts`; `Look`, `Pose` from `hooks/cat.ts`; `Activity`, `Gait`, `Motion`, `Spot` from `types/index.d.ts`.
-- Produces: `STAGE_WIDTH = 180`, `STAGE_HEIGHT = 48`, `type StageInput = { pose: Pose; activity: Activity | null; from: Spot; to: Spot; motion: Motion; gait: Gait }`, `stageFor(s: StageInput): string`. In this task both gaits move the front view (the slide); Task 7 gives `walk` its own drawing.
+- Consumes: `frontView`, `frontStyle`, `DEFS`, `REDUCED`, `HEART`, `HEART_PATH`, `LOVE` from `hooks/drawing.ts`; `Look`, `Pose` from `hooks/cat.ts`; `Activity`, `Gait`, `Motion`, `Spot` from `types/index.d.ts`.
+- Produces: `STAGE_WIDTH = 180`, `STAGE_HEIGHT = 48`, `type StageInput = { pose: Pose; activity: Activity | null; from: Spot; to: Spot; motion: Motion; gait: Gait }`, `stageFor(s: StageInput): string`, `heartFor(h: { to: Spot; motion: Motion }): string` (the hover heart, a stage-sized picture). In this task both gaits move the front view (the slide); Task 7 gives `walk` its own drawing.
 
 Markup, so later tasks and tests can rely on it: `<g class="spot" transform="translate(X 0)">` holds `<g class="act">`, which holds `<g class="front">` around a nested 120 x 96 `<svg>`. The nested viewport keeps every transform origin of the front view where it is on the single drawing.
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `hooks/stage.test.ts`, and add `import { stageFor } from './stage'` and `import type { StageInput } from './stage'` to its imports:
+Append to `hooks/stage.test.ts`, and add `import { heartFor, stageFor } from './stage'` and `import type { StageInput } from './stage'` to its imports:
 
 ```ts
 const BASE: StageInput = { pose: 'awake', activity: null, from: 'middle', to: 'middle', motion: 'auto', gait: 'slide' }
@@ -1038,8 +1102,23 @@ test('motion decides the style sheet and the reduced-motion query', () => {
   expect(stageFor({ ...BASE, motion: 'always' })).not.toContain('prefers-reduced-motion')
   expect(stageFor({ ...BASE, motion: 'auto' })).toContain('prefers-reduced-motion:reduce')
   for (const motion of ['auto', 'always', 'never'] as const) {
-    expect(stageFor({ ...BASE, motion }), motion).toContain('class="heart" opacity="0"')
+    expect(stageFor({ ...BASE, motion }), motion).not.toContain('class="heart"')
   }
+})
+
+test('the hover heart sits beside her head on her spot, and floats when she may move', () => {
+  for (const [to, x] of [['left', 0], ['middle', 120], ['right', 240]] as const) {
+    const svg = heartFor({ to, motion: 'always' })
+    expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" width="360" height="96">')).toBe(true)
+    expect(svg).toContain(`<g transform="translate(${x} 0)">`)
+    expect(svg).toMatch(/^[ -~]+$/)
+    expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=|opacity="0"/i)
+  }
+  expect(heartFor({ to: 'left', motion: 'always' })).toContain('.heart{transform-origin:90px 16px;animation:love 1.8s ease-out infinite}')
+  expect(heartFor({ to: 'left', motion: 'always' })).not.toContain('prefers-reduced-motion')
+  expect(heartFor({ to: 'left', motion: 'auto' })).toContain('prefers-reduced-motion:reduce')
+  expect(heartFor({ to: 'left', motion: 'never' })).not.toContain('<style>')
+  expect(heartFor({ to: 'right', motion: 'auto' })).toBe(heartFor({ to: 'right', motion: 'auto' }))
 })
 
 test('a slide carries the front view with a bob and stepping paws', () => {
@@ -1074,7 +1153,7 @@ Create `hooks/stage.ts`:
 ```ts
 import type { Activity, Gait, Motion, Spot } from '../types'
 import type { Look, Pose } from './cat'
-import { DEFS, frontStyle, frontView, REDUCED } from './drawing'
+import { DEFS, frontStyle, frontView, HEART, HEART_PATH, LOVE, REDUCED } from './drawing'
 
 // Mango's stage on the picture surfaces: three spots, each as wide as she is, on a
 // 360 x 96 grid shown at half that. A new picture walks her once from the spot she was
@@ -1153,6 +1232,19 @@ export const stageFor = (s: StageInput): string => {
     `</g></g></svg>`
   )
 }
+
+// The hover heart: a picture as big as the stage, empty but for the v1 heart beside her
+// head on spot `to`. The band shows it only while a pointer rests on her, because a
+// picture drawn as an image gets no :hover of its own. Without motion it simply stands.
+export const heartFor = (h: { to: Spot; motion: Motion }): string => {
+  const style = h.motion === 'never' ? '' : `<style>${LOVE}.heart{transform-origin:90px 16px;animation:love 1.8s ease-out infinite}${h.motion === 'auto' ? REDUCED : ''}</style>`
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" width="360" height="96">` +
+    style +
+    `<g transform="translate(${SPOT_X[h.to]} 0)">${view(`<path class="heart" d="${HEART_PATH}" fill="${HEART}"/>`)}</g>` +
+    `</svg>`
+  )
+}
 ```
 
 - [ ] **Step 4: Run the tests and the type check**
@@ -1164,7 +1256,7 @@ Expected: all pass; tsc prints nothing.
 
 ```bash
 git add hooks/stage.ts hooks/stage.test.ts
-git commit -m "Add Mango's three-spot stage, with a slide between spots"
+git commit -m "Add Mango's three-spot stage and hover heart, with a slide between spots"
 ```
 
 ---
@@ -1229,7 +1321,7 @@ In `hooks/stage.ts`:
 1. Change the drawing import to:
 
 ```ts
-import { AMBER, COAT, DEFS, EAR, frontStyle, frontView, NOSE, PUPIL, REDUCED, RIM, tailStrokes, WHITE } from './drawing'
+import { AMBER, COAT, DEFS, EAR, frontStyle, frontView, HEART, HEART_PATH, LOVE, NOSE, PUPIL, REDUCED, RIM, tailStrokes, WHITE } from './drawing'
 ```
 
 2. Add after `view`:
@@ -1470,8 +1562,8 @@ git commit -m "Let Mango walk between spots in a side view of her own"
 - Test: `hooks/mango.test.ts`
 
 **Interfaces:**
-- Consumes: `REST`, `showing` from `hooks/activity.ts`; `stageFor`, `STAGE_WIDTH`, `STAGE_HEIGHT` from `hooks/stage.ts`; `altFor` from `hooks/drawing.ts`; `Look` via `frameFor`/`faceFor`/`toneFor` from `hooks/cat.ts`.
-- Produces: atoms `stage` (default `REST`), `motion` (default `'auto'`), `gait` (default `'walk'`) in `register.tsx`; the `isStill` atom is gone. `/mango still | move | auto | walk | slide`. The desktop draws `stageFor(...)` at 180 x 48 (90 x 24 short) with `isInteractive` only when motion is not `never`; the terminal draws `frameFor(look)` where `look` follows `showing(...)`.
+- Consumes: `REST`, `showing` from `hooks/activity.ts`; `heartFor`, `stageFor`, `STAGE_WIDTH`, `STAGE_HEIGHT` from `hooks/stage.ts`; `altFor` from `hooks/drawing.ts`; `Look` via `frameFor`/`faceFor`/`toneFor` from `hooks/cat.ts`.
+- Produces: atoms `stage` (default `REST`), `motion` (default `'auto'`), `gait` (default `'walk'`) in `register.tsx`; the `isStill` atom is gone. `/mango still | move | auto | walk | slide`. The desktop draws `stageFor(...)` at 180 x 48 (90 x 24 short), always as an image (`isInteractive: false`), with `heartFor(...)` at the same size in an absolute Box over it that a hover shows; the terminal draws `frameFor(look)` where `look` follows `showing(...)`.
 
 Behaviour change from v1, by the spec's priority: a timed mood (ruffled, proud) now beats working, so a failed command shows ruffled during the turn instead of after it.
 
@@ -1488,6 +1580,29 @@ In `hooks/mango.test.ts`:
 ```
 
 2. In `a short desktop band draws the picture at half size`, change the two expectations to `toBe(90)` and `toBe(24)`.
+
+2b. In `the desktop picture keeps its markup across ticks and changes with the mood`, change `expect(before?.props.isInteractive).toBe(true)` to `toBe(false)` and the comment below it to `// A changed source would restart her animations.` Then add:
+
+```ts
+test('the desktop draws Mango as an image, with a heart that a hover shows', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const [cat, heart] = await ui.findAll({ type: 'Svg' })
+  expect(cat?.props.isInteractive).toBe(false)
+  expect(String(cat?.props.source)).not.toContain('class="heart"')
+  expect(heart?.props.isInteractive).toBe(false)
+  expect(heart?.props.width).toBe(180)
+  expect(heart?.props.height).toBe(48)
+  expect(String(heart?.props.source)).toContain('<g transform="translate(120 0)">')
+  // No key on the holder: the hover then follows the pointer on the keyed Box around her.
+  const holder = (await ui.findAll({ type: 'Box' })).find(b => b.props.position === 'absolute')
+  expect(holder?.key).toBeUndefined()
+  expect(holder?.props).toMatchObject({ top: 0, left: 0, display: 'none', hover: { display: 'flex' } })
+})
+```
 
 3. Replace the test `/mango still and move toggle the flag` with:
 
@@ -1506,7 +1621,7 @@ test('/mango still, move and auto store how she moves and redraw her', async ($,
   expect(String((await cat())?.source)).not.toContain('<style>')
   expect((await run($, 'move')).text).toBe('Mango always moves.')
   expect(data.get('motion')).toBe('always')
-  expect((await cat())?.isInteractive).toBe(true)
+  expect((await cat())?.isInteractive).toBe(false)
   expect(String((await cat())?.source)).toContain('<style>')
   expect(String((await cat())?.source)).not.toContain('prefers-reduced-motion')
   expect((await run($, 'auto')).text).toBe('Mango follows your system.')
@@ -1552,7 +1667,7 @@ test('junk stored settings fall back to auto and walk, and a non-true isStill ne
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
   const cat = await ui.find({ type: 'Svg' })
-  expect(cat?.props.isInteractive).toBe(true)
+  expect(cat?.props.isInteractive).toBe(false)
   expect(String(cat?.props.source)).toContain('prefers-reduced-motion:reduce')
   expect(data.get('motion')).toBe('fast')
 })
@@ -1601,7 +1716,7 @@ import type { Gait, Mood, Motion } from '../types'
 import { REST, showing } from './activity'
 import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS, toneFor } from './cat'
 import { altFor } from './drawing'
-import { STAGE_HEIGHT, STAGE_WIDTH, stageFor } from './stage'
+import { heartFor, STAGE_HEIGHT, STAGE_WIDTH, stageFor } from './stage'
 ```
 
 2. Replace `export const isStill = ...` with:
@@ -1712,14 +1827,20 @@ const setGait = async ($: EngineType, value: Gait): Promise<void> => {
     if (!isTerminal) {
       // Surfaces that draw an Svg get the stage; a short band gets it at half size. The
       // markup follows the stage, pose, motion and gait, never the tick, so her animations
-      // run on between periods. An interactive frame lets CSS motion and hover play.
+      // run on between periods. Always an image: a frame reloads, and blinks, on every new
+      // source. An image gets no :hover, so the heart is its own picture over her, which
+      // the band shows while the pointer is on the keyed Box around her.
       const { Svg } = $.ui.resolve(e)
       const scale = isShort ? 0.5 : 1
       const source = stageFor({ pose: now.pose, activity: now.activity, from: st.from, to: st.to, motion: moves, gait: await read($, gait) })
+      const size = { width: STAGE_WIDTH * scale, height: STAGE_HEIGHT * scale }
       return (
         <Box alignItems="center">
           <Box key="cat">
-            <Svg source={source} alt={altFor(now.pose, now.activity)} width={STAGE_WIDTH * scale} height={STAGE_HEIGHT * scale} isInteractive={!still} />
+            <Svg source={source} alt={altFor(now.pose, now.activity)} {...size} isInteractive={false} />
+            <Box position="absolute" top={0} left={0} display="none" hover={{ display: 'flex' }}>
+              <Svg source={heartFor({ to: st.to, motion: moves })} alt="A heart floats over Mango." {...size} isInteractive={false} />
+            </Box>
           </Box>
           {speech}
         </Box>
@@ -2542,7 +2663,7 @@ Then bind the PR with the ccd_pr tools and read its CI. Ward's node job skips (t
 
 - [ ] **Step 6: Merge, release and reinstall, each only with Malin's yes**
 
-Ask Malin before each: merging the PR, then the v0.2.0 release on the merge commit (draft notes in the repo's style and show them first). After the merge, reinstall the way Task 1 Step 3 does it, verify the cache with Task 1 Steps 1 and 2 against the merge commit, and ask her to open a NEW session to look. Her system asks for reduced motion, so with the default `auto` she will see Mango still: tell her `/mango move` shows the walk, and `/mango auto` puts it back.
+Ask Malin before each: merging the PR, then the v0.2.0 release on the merge commit (draft notes in the repo's style and show them first). After the merge, reinstall the way Task 1 Step 2 does it, verify the cache with Task 1 Steps 3 and 4 against the merge commit, and ask her to open a NEW session to look. Her system asks for reduced motion, so with the default `auto` she will see Mango still: tell her `/mango move` shows the walk, and `/mango auto` puts it back.
 
 - [ ] **Step 7: Update memory**
 
