@@ -2,13 +2,14 @@ import { expect, test } from 'claude-code/testing'
 import { faceFor, frameFor, isTestCommand, remarkFor, resolveMood, toneFor } from './cat'
 import { altFor, drawingFor } from './drawing'
 
-test('frames are two rows of exactly ten columns for every pose and tick', () => {
-  const poses = ['awake', 'sleeping', 'ruffled', 'proud', 'worried', 'working'] as const
-  for (const pose of poses) {
-    for (const t of [0, 1, 7, 8, 9, 16]) {
-      const [a, b] = frameFor(pose, t)
-      expect(a.length, `${pose} row1 at ${t}`).toBe(10)
-      expect(b.length, `${pose} row2 at ${t}`).toBe(10)
+const LOOKS = ['awake', 'sleeping', 'ruffled', 'proud', 'worried', 'working', 'sniffing', 'watching', 'peering', 'waiting', 'pouncing', 'chasing'] as const
+
+test('frames are two rows of exactly ten columns for every look and tick', () => {
+  for (const look of LOOKS) {
+    for (const t of [0, 1, 2, 3, 7, 8, 9, 16]) {
+      const [a, b] = frameFor(look, t)
+      expect(a.length, `${look} row1 at ${t}`).toBe(10)
+      expect(b.length, `${look} row2 at ${t}`).toBe(10)
       expect(a).toMatch(/^[ -~]+$/)
       expect(b).toMatch(/^[ -~]+$/)
     }
@@ -28,9 +29,7 @@ test('working alternates two kneading frames', () => {
 })
 
 test('faces are five columns', () => {
-  for (const pose of ['awake', 'sleeping', 'ruffled', 'proud', 'worried', 'working'] as const) {
-    expect(faceFor(pose, 0).length).toBe(5)
-  }
+  for (const look of LOOKS) expect(faceFor(look, 0).length, look).toBe(5)
 })
 
 test('remarks rotate by tick and never repeat the same line twice in a row', () => {
@@ -106,4 +105,26 @@ test('each mood has a theme colour for its remarks', () => {
   expect(toneFor('worried')).toBe('warning')
   expect(toneFor('sleeping')).toBe('suggestion')
   expect(toneFor('awake')).toBe('claude')
+})
+
+test('each activity has its own rows, and the busy ones alternate', () => {
+  expect(frameFor('sniffing', 0)[1]).toContain('( o.o )..')
+  expect(frameFor('sniffing', 1)[1]).toContain('( o.o ).')
+  expect(frameFor('watching', 0)[1]).toContain('(o.o  )')
+  expect(frameFor('watching', 2)[1]).toContain('(  o.o)')
+  expect(frameFor('peering', 0)[1]).toContain('( O.O ) >')
+  expect(frameFor('waiting', 0)[1]).toContain('( -.- ) ~')
+  expect(frameFor('waiting', 1)[1]).toContain('( -.- ) .')
+  expect(frameFor('pouncing', 0)[1]).toContain('( ^o^ ) /')
+  expect(frameFor('chasing', 0)[1]).toContain('( >o< )==')
+  expect([faceFor('peering', 0), faceFor('waiting', 0), faceFor('pouncing', 0), faceFor('chasing', 0)]).toEqual(['(O.O)', '(-.-)', '(^o^)', '(>o<)'])
+  for (const look of ['sniffing', 'watching', 'peering', 'waiting', 'pouncing', 'chasing'] as const) {
+    expect(frameFor(look, 0)[0].trimEnd(), look).toBe(' /\\_/\\')
+  }
+})
+
+test('activity lines speak in the claude colour, a pounce or chase in success', () => {
+  for (const look of ['sniffing', 'watching', 'peering', 'waiting'] as const) expect(toneFor(look)).toBe('claude')
+  expect(toneFor('pouncing')).toBe('success')
+  expect(toneFor('chasing')).toBe('success')
 })
