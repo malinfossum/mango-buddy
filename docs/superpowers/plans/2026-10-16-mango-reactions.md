@@ -39,7 +39,7 @@
 
 **Result:** the heart showed on hover, floated, went away and nothing blinked or shifted. But the desktop drew it in a small dark popover card above the band, not beside her head, and it was tiny. An absolute Box revealed by hover is placed as a card outside the band's rows. I dropped hover from this version (the spec's fallback); Tasks 5, 6 and 8 are updated to match. The steps below are kept as the record.
 
-The swap probe is done (2026-10-16): a frame (`isInteractive: true`) blinks on every new source, and an image moves and swaps with no blink. So the stage is always an image, and the hover heart moves to its own picture in an absolute Box that a hover shows. This task checks that layering on the desktop before anything is built on it. All code here is throwaway.
+The swap probe is done (2026-10-16): a frame (`isInteractive: true`) blinks on every new source, and an image moves and swaps with no blink. So the stage is always an image, and the hover heart was to move to its own picture in an absolute Box that a hover shows (superseded: see Result). This task checked that layering on the desktop before anything is built on it. All code here is throwaway.
 
 **Files:**
 - Throwaway, on branch `spike/hover-heart`: `hooks/register.tsx`
@@ -150,7 +150,7 @@ git branch -D spike/hover-heart
 Write one dated line under a new `**Hover probe (date):**` heading in `reactions-design.md` with her words.
 
 - The heart shows on hover, sits beside her head, floats, goes away and nothing jumps: tick this task and go on to Task 2.
-- Anything else: **stop here.** Do not start Task 2. Tell Malin what she saw and offer the spec's fallback (drop hover for now) or a new probe. The plan below assumes the overlay works.
+- Anything else: **stop here.** Do not start Task 2. Tell Malin what she saw and offer the spec's fallback (drop hover for now) or a new probe.
 
 ---
 
@@ -326,8 +326,8 @@ export const spotFor = (activity: Activity, current: Spot): Spot => {
 }
 
 // The stage an activity asks for, starting from where she stands. The same activity keeps
-// the stage as it is, so a burst of Reads, or a second commit inside one window, draws
-// nothing new and never restarts a walk.
+// the stage as it is, so a burst of Reads, or a second commit that returns within one
+// clock period, draws nothing new and never restarts a walk.
 export const nextStage = (shown: Stage, activity: Activity): Stage =>
   shown.activity === activity ? shown : { activity, from: shown.to, to: spotFor(activity, shown.to) }
 
@@ -954,9 +954,10 @@ const LOOK_KEYFRAMES = [
 9. Replace `styleFor`, `altFor` and `drawingFor` with:
 
 ```ts
-// A look's style for the stage: everything but hover, which a picture drawn as an image
-// never gets, and the reduced-motion query, which the stage adds or leaves out by the
-// motion setting.
+// A look's style for the stage: no hover rules, which a picture drawn as an image never
+// gets, and no reduced-motion query, which the stage adds or leaves out by the motion
+// setting. The heart's keyframes and origin ride along unused, so drawingFor stays byte
+// for byte the same.
 export const frontStyle = (look: Look): string => `${KEYFRAMES}${LOOK_KEYFRAMES}${ORIGINS}${motionFor(look)}`
 
 // The front view's markup on the 120 x 96 grid, without the <svg> around it, a style or
@@ -1604,10 +1605,13 @@ test('an old isStill: true loads as never and is written as motion once', async 
   await $.session.start(START)
   expect(data.get('motion')).toBe('never')
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
-  expect((await ui.find({ type: 'Svg' }))?.props.isInteractive).toBe(false)
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.isInteractive).toBe(false)
+  // Loaded as never: a still picture has no style sheet.
+  expect(String(cat?.props.source)).not.toContain('<style>')
 })
 
-test('a stored motion wins over an old isStill, and junk falls back to the defaults', async ($, on) => {
+test('a stored motion wins over an old isStill', async ($, on) => {
   mock.clock(on)
   const kept = memoryStore(on, { isStill: true, motion: 'always' })
   answerStart(on)
@@ -2136,7 +2140,7 @@ test('a failed bookkeeping write never blocks a tool or leaves her waiting', asy
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `claude plugin test .`
-Expected: FAIL in the new tests (no hook sets an activity yet). Every older test still passes.
+Expected: FAIL in the new tests (no hook sets an activity yet). Every older test still passes. Two new tests are guards that already pass here, and that is expected: `TodoWrite and other tools leave her be` and `a failed bookkeeping write never blocks a tool or leaves her waiting`.
 
 - [ ] **Step 3: Keep the activity in module state and write it once per period**
 
@@ -2408,7 +2412,7 @@ If `lineOf`'s parameter type does not accept the mounted drawing, inline `(await
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `claude plugin test .`
-Expected: FAIL in the new tests (no lines yet).
+Expected: FAIL in the new tests (no lines yet). One is a guard that already passes here, and that is expected: `an activity line never replaces a purr, and its end leaves the purr`.
 
 - [ ] **Step 3: Say the lines**
 
@@ -2492,7 +2496,7 @@ const clearActivityRemark = async ($: EngineType) => {
     return next(e)
 ```
 
-6. In the Bash hook, add `const started = clockTick` as its first line, and replace the last two statements (`if (step !== null) ...` and `return ran`) with:
+6. In the Bash hook, add `const started = clockTick` as its first line, and replace the last two statements (`if (step !== null) ...` and `return ran`) and the comment Task 9 put above them with:
 
 ```ts
     // A commit or push that went through: she pounces on it, or chases it out.
@@ -2559,7 +2563,7 @@ She follows along while Claude works, too. She sniffs at the files it reads, wat
 | `/mango walk` / `slide` | She walks between spots on four paws, or slides there (walk is the default) |
 ```
 
-3. In "Gentle by design", change the end of the "She is alive on desktop" bullet to `She holds still when your system asks for reduced motion, unless you tell her `/mango move`.` and add after "She never phones home":
+3. In "Gentle by design", replace the whole "She is alive on desktop" bullet, so it no longer promises a hover reaction (the spec drops hover), keeping the bullet's bold lead-in: `She breathes, blinks, twitches an ear and swishes her tail, and each mood moves in its own way. She holds still when your system asks for reduced motion, unless you tell her `/mango move`.` Then add after "She never phones home":
 
 ```markdown
 - **She only glances at names.** She may say the name of a file Claude reads or edits, or the site it visits, and nothing more: never a folder, a search, a command or its output. `/mango mute` keeps her quiet.
@@ -2615,7 +2619,7 @@ Then bind the PR with the ccd_pr tools and read its CI. Ward's node job skips (t
 
 - [ ] **Step 6: Merge, release and reinstall, each only with Malin's yes**
 
-Ask Malin before each: merging the PR, then the v0.2.0 release on the merge commit (draft notes in the repo's style and show them first). After the merge, reinstall the way Task 1 Step 2 does it, verify the cache with Task 1 Steps 3 and 4 against the merge commit, and ask her to open a NEW session to look. Her system asks for reduced motion, so with the default `auto` she will see Mango still: tell her `/mango move` shows the walk, and `/mango auto` puts it back.
+Ask Malin before each: merging the PR, then the v0.2.0 release on the merge commit (draft notes in the repo's style and show them first). After the merge, reinstall the way Task 1 Step 2 does it, verify the cache with Task 1 Steps 3 and 4 against the merge commit (add `hooks/activity.ts` and `hooks/stage.ts` to that file loop), and ask her to open a NEW session to look. Her system asks for reduced motion, so with the default `auto` she will see Mango still: tell her `/mango move` shows the walk, and `/mango auto` puts it back.
 
 - [ ] **Step 7: Update memory**
 

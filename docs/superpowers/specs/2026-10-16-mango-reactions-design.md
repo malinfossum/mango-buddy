@@ -34,7 +34,7 @@ Every other tool (TodoWrite and the rest) does nothing. "Command position" means
 
 **Priority, highest first:** a timed mood (ruffled, proud), then an activity, then working (`isWorking`), then the resting mood (awake, sleeping, worried). An activity counts as activity for sleep: it wakes her the way any tool call does today.
 
-Pouncing and chasing play once per picture. Two commits inside one activity window do not replay the pounce, because the stage does not change. When she has to move to the middle first, the pounce or chase starts once the move ends (an `animation-delay` of the move's length). A chase uses the current gait. Without motion she shows the activity's face at the middle and does not hop or run.
+Pouncing and chasing play once per picture. A second commit that returns within one clock period does not replay the pounce, because the stage does not change. One that runs longer shows waiting first, so its pounce replays. When she has to move to the middle first, the pounce or chase starts once the move ends (an `animation-delay` of the move's length). A chase uses the current gait. Without motion she shows the activity's face at the middle and does not hop or run.
 
 ## Lines
 
