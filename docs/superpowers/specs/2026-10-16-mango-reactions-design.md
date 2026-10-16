@@ -72,7 +72,8 @@ She speaks at notable moments only. Each line has two or three variants, picked 
   - Pouncing: crouch, hop, land, once.
   - Chasing: dashes to the right edge and back, once.
 - **Timed moods and resting moods** draw as today, at her current spot.
-- **Hover heart and interactivity** stay as in v1 whenever motion is allowed.
+- **Always an image:** the stage is drawn with `isInteractive: false` in every motion setting. A sandboxed frame reloads on every new source, and that reload is a visible blink (probe, 2026-10-16). An image keeps the CSS motion and swaps with no blink, but it gets no `:hover`.
+- **Hover heart:** a second Svg, `heartFor({ to, motion })` in `stage.ts`, as big as the stage and transparent apart from a heart above her head at spot `to`. It sits on the stage at `position: "absolute"`, `top: 0`, `left: 0`, inside the stage's keyed Box, drawn `display: "none"` with `hover: { display: "flex" }`. While a pointer rests on the stage the heart shows and floats (the v1 `love` animation; under `never`, or `auto` with reduced motion, it stands still). The v1 hover ear perk and eye widen are dropped: they need `:hover` inside the picture.
 - **Alt text:** `altFor(pose, activity)` names the activity when one shows (`Mango, a black cat, sniffs around.`), and the mood otherwise, as today.
 
 ### Gait
@@ -90,9 +91,9 @@ She speaks at notable moments only. Each line has two or three variants, picked 
 |---|---|---|
 | auto | `/mango auto` | Moves, with the reduced-motion media query: a system that asks for reduced motion sees her still |
 | always | `/mango move` | Moves, and the media query is left out |
-| never | `/mango still` | No style sheet, a plain image (`isInteractive: false`) as in v1 still mode |
+| never | `/mango still` | No style sheet: a still picture |
 
-Still, in every form, means she is drawn at `to` with no move.
+All three are images (`isInteractive: false`). Still, in every form, means she is drawn at `to` with no move.
 
 ## Terminal
 
@@ -121,7 +122,7 @@ Session values, added to `types/index.d.ts` under `mango`:
 
 `Activity` is `'sniffing' | 'watching' | 'peering' | 'waiting' | 'pouncing' | 'chasing'`. `Spot` is `'left' | 'middle' | 'right'`, starting at `middle`.
 
-- **One atom, one write:** the engine redraws the band on every write to an atom the picture read, and each desktop redraw rebuilds the frame (the v1 blink). So activity, from and to live in one atom, and a burst of Reads writes it once.
+- **One atom, one write:** the engine redraws the band on every write to an atom the picture read, and each desktop redraw can rebuild the picture and restart its animations. So activity, from and to live in one atom, and a burst of Reads writes it once.
 - **What the picture reads:** `stage`, `shownMood`, `motion`, `gait`, never `tick`.
 - **Module state, not atoms:** `pendingStage`, `activityUntil` (a clock tick), `runningWaits`, the three first-of-turn flags, `lastLineTick` and `activityRemark`. None of these redraw anything. A Bash call's start tick is a local inside its own hook call, so parallel calls never overwrite each other's.
 - **Stored (`$.store`):** `motion` and `gait`, read once in `session.start` into atoms and written on change. If `motion` is missing and `isStill` is `true`, `motion` becomes `never` and is written back; `isStill` is no longer read after that.
@@ -157,7 +158,8 @@ Written before the code, in `hooks/activity.test.ts`, `hooks/stage.test.ts` and 
 - Lines: Read shows the basename only, never the directory, for both `/home/a/x.ts` and `C:\Users\someone\x.ts`; non-ASCII and control characters become `?`; long names are cut. WebFetch shows the host only, never userinfo, port or path; a bad URL or a `file:` URL gives no line. Grep, Glob and WebSearch lines never contain their pattern or query.
 - `git commit` and `git push` count at command position only: `echo git commit` and `cat git-push.md` do not.
 - `altFor` names each activity.
-- `stageFor`: `from === to` has no move; `never` has no `<style>`; `always` has no `prefers-reduced-motion`; `auto` has it; `walk` contains the side view, `slide` does not; the side view and heart carry `opacity="0"`. Same inputs give the same string.
+- `stageFor`: `from === to` has no move; `never` has no `<style>`; `always` has no `prefers-reduced-motion`; `auto` has it; `walk` contains the side view, `slide` does not; the side view carries `opacity="0"`; the stage holds no heart. Same inputs give the same string.
+- `heartFor`: the heart sits above spot `to`; `never` has no `<style>`; `auto` has the reduced-motion query, `always` does not. Same inputs give the same string.
 
 **Kit (`mango.test.ts`):**
 - A Read moves her left and shows `Mango sniffs at x.ts.`; a second Read in the same turn shows no new line; after `prompt.submit` the next Read does.
@@ -170,8 +172,11 @@ Written before the code, in `hooks/activity.test.ts`, `hooks/stage.test.ts` and 
 - A successful `git commit` sets pouncing; a failed one ruffles her.
 - `still`, `move`, `auto`, `walk` and `slide` store their values and redraw; a stored `isStill: true` with no `motion` loads as `never` and writes `motion`.
 - Terminal: an activity draws its rows; a timed mood beats it.
+- Desktop: the stage Svg has `isInteractive: false` under `auto`, `always` and `never`; the heart Svg sits in an absolute Box with `display: "none"` and a hover of `display: "flex"`.
 
-**By hand, first task of the plan:** in a new session, trigger a picture swap (a failing command, then a Read) and check whether the band flashes. If it does, stop and redesign before building on top: activities swap the picture far more often than moods do.
+**Swap probe, done 2026-10-16:** a frame (`isInteractive: true`) blinks on every new source; an image moves and swaps moods with no blink (throwaway spike, a mood every 3 s, watched on the desktop).
+
+**By hand, first task of the plan:** a throwaway hover probe. Draw the heart overlay as above over today's picture, install it, and check in a new session that a pointer on Mango shows the heart over her head and that it floats. If the heart does not show or sits in the wrong place, stop and settle hover before building on top.
 
 **After the build:** rerun `/tmp/mango-render/readme-art.mjs` if the front view changed, and check the stage in the motion harness (`poses.mjs`), never by asking for Windows animation effects.
 
@@ -187,6 +192,8 @@ Written before the code, in `hooks/activity.test.ts`, `hooks/stage.test.ts` and 
 
 - **Filenames on a shared screen.** A basename shows in the band, so a screen share shows it too. Accepted: it is only the basename, she says it once per turn, and `/mango mute` hides it.
 - **Writing the line in the same period as the stage.** A remark write redraws the band just as it does in v1 (purr, yawn). Lines are capped at one per 10 s, so batching them with the stage write would add code for no visible gain.
+- **A frame for hover.** `isInteractive: true` gives `:hover` inside the picture, but the frame reloads on every new source and blinks (probe, 2026-10-16). Activities swap the picture often, so the blink would show all session.
+- **Two frames overlapped during a swap.** The new frame drawn over the old, the old dropped after a timer. It keeps hover but costs a timer per swap and shows two cats where the poses differ.
 - **A per-call id to replay a pounce.** Replaying would need a changing value in the picture source. Two commits inside 4.5 s are rare, so it stays out.
 
 > Stress-tested 2026-10-16 (skill 1b85fca): 8 applied, 1 adapted, 0 decided by me.
