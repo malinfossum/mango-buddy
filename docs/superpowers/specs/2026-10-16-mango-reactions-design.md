@@ -73,7 +73,7 @@ She speaks at notable moments only. Each line has two or three variants, picked 
   - Chasing: dashes to the right edge and back, once.
 - **Timed moods and resting moods** draw as today, at her current spot.
 - **Always an image:** the stage is drawn with `isInteractive: false` in every motion setting. A sandboxed frame reloads on every new source, and that reload is a visible blink (probe, 2026-10-16). An image keeps the CSS motion and swaps with no blink, but it gets no `:hover`.
-- **Hover heart:** a second Svg, `heartFor({ to, motion })` in `stage.ts`, as big as the stage and transparent apart from the v1 heart beside her head (top right) at spot `to`. It sits on the stage at `position: "absolute"`, `top: 0`, `left: 0`, inside the stage's keyed Box, drawn `display: "none"` with `hover: { display: "flex" }`. While a pointer rests on the stage the heart shows and floats (the v1 `love` animation; under `never`, or `auto` with reduced motion, it stands still). The v1 hover ear perk and eye widen are dropped: they need `:hover` inside the picture.
+- **No hover in this version:** an image gets no `:hover`, so the v1 hover heart, ear perk and eye widen go. A heart drawn over her in an absolute Box failed its probe (2026-10-16): the desktop shows such a Box as a popover card above the band, not over Mango. A hover card can come back later as its own change.
 - **Alt text:** `altFor(pose, activity)` names the activity when one shows (`Mango, a black cat, sniffs around.`), and the mood otherwise, as today.
 
 ### Gait
@@ -158,8 +158,7 @@ Written before the code, in `hooks/activity.test.ts`, `hooks/stage.test.ts` and 
 - Lines: Read shows the basename only, never the directory, for both `/home/a/x.ts` and `C:\Users\someone\x.ts`; non-ASCII and control characters become `?`; long names are cut. WebFetch shows the host only, never userinfo, port or path; a bad URL or a `file:` URL gives no line. Grep, Glob and WebSearch lines never contain their pattern or query.
 - `git commit` and `git push` count at command position only: `echo git commit` and `cat git-push.md` do not.
 - `altFor` names each activity.
-- `stageFor`: `from === to` has no move; `never` has no `<style>`; `always` has no `prefers-reduced-motion`; `auto` has it; `walk` contains the side view, `slide` does not; the side view carries `opacity="0"`; the stage holds no heart. Same inputs give the same string.
-- `heartFor`: the heart sits above spot `to`; `never` has no `<style>`; `auto` has the reduced-motion query, `always` does not. Same inputs give the same string.
+- `stageFor`: `from === to` has no move; `never` has no `<style>`; `always` has no `prefers-reduced-motion`; `auto` has it; `walk` contains the side view, `slide` does not; the side view carries `opacity="0"`; the stage holds no heart and no `:hover`. Same inputs give the same string.
 
 **Kit (`mango.test.ts`):**
 - A Read moves her left and shows `Mango sniffs at x.ts.`; a second Read in the same turn shows no new line; after `prompt.submit` the next Read does.
@@ -172,11 +171,11 @@ Written before the code, in `hooks/activity.test.ts`, `hooks/stage.test.ts` and 
 - A successful `git commit` sets pouncing; a failed one ruffles her.
 - `still`, `move`, `auto`, `walk` and `slide` store their values and redraw; a stored `isStill: true` with no `motion` loads as `never` and writes `motion`.
 - Terminal: an activity draws its rows; a timed mood beats it.
-- Desktop: the stage Svg has `isInteractive: false` under `auto`, `always` and `never`; the heart Svg sits in an absolute Box with `display: "none"` and a hover of `display: "flex"`.
+- Desktop: the stage is the band's only Svg, with `isInteractive: false` under `auto`, `always` and `never`.
 
 **Swap probe, done 2026-10-16:** a frame (`isInteractive: true`) blinks on every new source; an image moves and swaps moods with no blink (throwaway spike, a mood every 3 s, watched on the desktop).
 
-**By hand, first task of the plan:** a throwaway hover probe. Draw the heart overlay as above over today's picture, install it, and check in a new session that a pointer on Mango shows the heart over her head and that it floats. If the heart does not show or sits in the wrong place, stop and settle hover before building on top.
+**Hover probe, done 2026-10-16:** a heart Svg in an absolute Box with `display: "none"` and a hover of `display: "flex"`, over today's picture. It showed on hover, floated, went away and nothing blinked or shifted. But it showed in a dark popover card above the band, not over Mango, and it was tiny. So hover is out of this version.
 
 **After the build:** rerun `/tmp/mango-render/readme-art.mjs` if the front view changed, and check the stage in the motion harness (`poses.mjs`), never by asking for Windows animation effects.
 
@@ -187,6 +186,7 @@ Written before the code, in `hooks/activity.test.ts`, `hooks/stage.test.ts` and 
 - Keeping her exact position when a new picture starts mid-walk: she restarts from the last `to`, which can look like a small jump.
 - Replaying a pounce or chase inside one activity window.
 - Activities for tools outside the table.
+- Any hover reaction. A heart in a hover card above Mango is the candidate for a later change.
 
 ## Considered and rejected
 

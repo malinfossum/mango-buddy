@@ -35,7 +35,9 @@
 
 ---
 
-### Task 1: Probe the hover heart over an image (Malin, by hand)
+### Task 1: Probe the hover heart over an image (Malin, by hand) (DONE 2026-10-16)
+
+**Result:** the heart showed on hover, floated, went away and nothing blinked or shifted. But the desktop drew it in a small dark popover card above the band, not beside her head, and it was tiny. An absolute Box revealed by hover is placed as a card outside the band's rows. I dropped hover from this version (the spec's fallback); Tasks 5, 6 and 8 are updated to match. The steps below are kept as the record.
 
 The swap probe is done (2026-10-16): a frame (`isInteractive: true`) blinks on every new source, and an image moves and swaps with no blink. So the stage is always an image, and the hover heart moves to its own picture in an absolute Box that a hover shows. This task checks that layering on the desktop before anything is built on it. All code here is throwaway.
 
@@ -760,7 +762,7 @@ git commit -m "Give each activity its own terminal rows and face"
 
 **Interfaces:**
 - Consumes: `Look`, `Pose` from `hooks/cat.ts`; `Activity` from `types/index.d.ts`; `ACTIVITIES` from `hooks/activity.ts` (tests only).
-- Produces in `hooks/drawing.ts`: exported palette `COAT`, `RIM`, `EAR`, `WHITE`, `AMBER`, `PUPIL`, `NOSE`, `HEART`; `DEFS`; `REDUCED`; `HEART_PATH` (the heart's path data); `LOVE` (the heart's float keyframes); `tailStrokes(d: string): string`; `frontView(look: Look, isAnimated: boolean): string` (the drawing's inner markup, no `<svg>`, no style and no heart); `frontStyle(look: Look): string` (keyframes, origins, the look's motion; no hover and no reduced-motion query); `altFor(pose: Pose, activity?: Activity | null): string`. `drawingFor(pose, isAnimated)` keeps its exact output.
+- Produces in `hooks/drawing.ts`: exported palette `COAT`, `RIM`, `EAR`, `WHITE`, `AMBER`, `PUPIL`, `NOSE`; `DEFS`; `REDUCED`; `tailStrokes(d: string): string`; `frontView(look: Look, isAnimated: boolean): string` (the drawing's inner markup, no `<svg>`, no style and no heart); `frontStyle(look: Look): string` (keyframes, origins, the look's motion; no hover and no reduced-motion query); `altFor(pose: Pose, activity?: Activity | null): string`. `drawingFor(pose, isAnimated)` keeps its exact output.
 
 `drawing.ts` must keep importing types only: the harness scripts import it straight into Node, which cannot resolve suffix-less value imports.
 
@@ -816,7 +818,7 @@ test('every look moves in its own way', () => {
   for (const look of LOOKS) {
     expect(frontStyle(look), look).toMatch(/@keyframes/)
     expect(frontStyle(look), look).not.toContain('prefers-reduced-motion')
-    // The stage is drawn as an image, which gets no :hover; the heart is its own picture.
+    // The stage is drawn as an image, which gets no :hover, so its style carries none.
     expect(frontStyle(look), look).not.toContain(':hover')
   }
 })
@@ -853,22 +855,7 @@ import type { Activity } from '../types'
 import type { Look, Pose } from './cat'
 ```
 
-2. Put `export` in front of `const COAT`, `RIM`, `EAR`, `WHITE`, `AMBER`, `PUPIL`, `NOSE`, `HEART`, `DEFS` and `REDUCED`. Then export the heart's parts for the stage's hover heart, keeping every string byte for byte. Replace the `heart` constant with:
-
-```ts
-export const HEART_PATH = 'M 96 14 C 96 10 91 9 90 13 C 89 9 84 10 84 14 C 84 18 90 21 90 23 C 90 21 96 18 96 14 Z'
-
-// Shown only while a pointer rests on her. Hidden by its own attribute, so a picture
-// without the style sheet never shows it.
-const heart = `<path class="heart" opacity="0" d="${HEART_PATH}" fill="${HEART}"/>`
-```
-
-and in `KEYFRAMES` replace the `'@keyframes love{...}'` line with `LOVE,`, declared above `KEYFRAMES` as:
-
-```ts
-// The heart's float, shared with the stage's hover heart.
-export const LOVE = '@keyframes love{0%{opacity:0;transform:translateY(4px) scale(0.6)}25%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-8px) scale(1)}}'
-```
+2. Put `export` in front of `const COAT`, `RIM`, `EAR`, `WHITE`, `AMBER`, `PUPIL`, `NOSE`, `DEFS` and `REDUCED`. Leave `HEART`, the `heart` constant and the `love` keyframes as they are: only the single drawing uses them (the stage has no hover, hover probe 2026-10-16).
 
 3. Replace `tail` with:
 
@@ -973,7 +960,7 @@ const LOOK_KEYFRAMES = [
 export const frontStyle = (look: Look): string => `${KEYFRAMES}${LOOK_KEYFRAMES}${ORIGINS}${motionFor(look)}`
 
 // The front view's markup on the 120 x 96 grid, without the <svg> around it, a style or
-// the heart (the stage draws its hover heart as a picture of its own).
+// the heart (the stage has no hover).
 // Sniffing lowers her head; everything else about a look is in its eyes, ears and motion.
 export const frontView = (look: Look, isAnimated: boolean): string => {
   const headGroup = `<g class="head">${ears(earsFor(look))}${head}${ruff}${eyes(eyesFor(look))}${face}</g>`
@@ -1050,21 +1037,21 @@ git commit -m "Give Mango's front view a look for each activity"
 
 ---
 
-### Task 6: The stage and its hover heart, with the slide gait
+### Task 6: The stage, with the slide gait
 
 **Files:**
 - Create: `hooks/stage.ts`
 - Test: `hooks/stage.test.ts`
 
 **Interfaces:**
-- Consumes: `frontView`, `frontStyle`, `DEFS`, `REDUCED`, `HEART`, `HEART_PATH`, `LOVE` from `hooks/drawing.ts`; `Look`, `Pose` from `hooks/cat.ts`; `Activity`, `Gait`, `Motion`, `Spot` from `types/index.d.ts`.
-- Produces: `STAGE_WIDTH = 180`, `STAGE_HEIGHT = 48`, `type StageInput = { pose: Pose; activity: Activity | null; from: Spot; to: Spot; motion: Motion; gait: Gait }`, `stageFor(s: StageInput): string`, `heartFor(h: { to: Spot; motion: Motion }): string` (the hover heart, a stage-sized picture). In this task both gaits move the front view (the slide); Task 7 gives `walk` its own drawing.
+- Consumes: `frontView`, `frontStyle`, `DEFS`, `REDUCED` from `hooks/drawing.ts`; `Look`, `Pose` from `hooks/cat.ts`; `Activity`, `Gait`, `Motion`, `Spot` from `types/index.d.ts`.
+- Produces: `STAGE_WIDTH = 180`, `STAGE_HEIGHT = 48`, `type StageInput = { pose: Pose; activity: Activity | null; from: Spot; to: Spot; motion: Motion; gait: Gait }`, `stageFor(s: StageInput): string`. In this task both gaits move the front view (the slide); Task 7 gives `walk` its own drawing.
 
 Markup, so later tasks and tests can rely on it: `<g class="spot" transform="translate(X 0)">` holds `<g class="act">`, which holds `<g class="front">` around a nested 120 x 96 `<svg>`. The nested viewport keeps every transform origin of the front view where it is on the single drawing.
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `hooks/stage.test.ts`, and add `import { heartFor, stageFor } from './stage'` and `import type { StageInput } from './stage'` to its imports:
+Append to `hooks/stage.test.ts`, and add `import { stageFor } from './stage'` and `import type { StageInput } from './stage'` to its imports:
 
 ```ts
 const BASE: StageInput = { pose: 'awake', activity: null, from: 'middle', to: 'middle', motion: 'auto', gait: 'slide' }
@@ -1106,21 +1093,6 @@ test('motion decides the style sheet and the reduced-motion query', () => {
   }
 })
 
-test('the hover heart sits beside her head on her spot, and floats when she may move', () => {
-  for (const [to, x] of [['left', 0], ['middle', 120], ['right', 240]] as const) {
-    const svg = heartFor({ to, motion: 'always' })
-    expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" width="360" height="96">')).toBe(true)
-    expect(svg).toContain(`<g transform="translate(${x} 0)">`)
-    expect(svg).toMatch(/^[ -~]+$/)
-    expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=|opacity="0"/i)
-  }
-  expect(heartFor({ to: 'left', motion: 'always' })).toContain('.heart{transform-origin:90px 16px;animation:love 1.8s ease-out infinite}')
-  expect(heartFor({ to: 'left', motion: 'always' })).not.toContain('prefers-reduced-motion')
-  expect(heartFor({ to: 'left', motion: 'auto' })).toContain('prefers-reduced-motion:reduce')
-  expect(heartFor({ to: 'left', motion: 'never' })).not.toContain('<style>')
-  expect(heartFor({ to: 'right', motion: 'auto' })).toBe(heartFor({ to: 'right', motion: 'auto' }))
-})
-
 test('a slide carries the front view with a bob and stepping paws', () => {
   const slide = stageFor({ ...BASE, motion: 'always', activity: 'sniffing', from: 'middle', to: 'left' })
   expect(slide).toContain('slide-bob 0.3s ease-in-out 0s 4')
@@ -1153,7 +1125,7 @@ Create `hooks/stage.ts`:
 ```ts
 import type { Activity, Gait, Motion, Spot } from '../types'
 import type { Look, Pose } from './cat'
-import { DEFS, frontStyle, frontView, HEART, HEART_PATH, LOVE, REDUCED } from './drawing'
+import { DEFS, frontStyle, frontView, REDUCED } from './drawing'
 
 // Mango's stage on the picture surfaces: three spots, each as wide as she is, on a
 // 360 x 96 grid shown at half that. A new picture walks her once from the spot she was
@@ -1232,19 +1204,6 @@ export const stageFor = (s: StageInput): string => {
     `</g></g></svg>`
   )
 }
-
-// The hover heart: a picture as big as the stage, empty but for the v1 heart beside her
-// head on spot `to`. The band shows it only while a pointer rests on her, because a
-// picture drawn as an image gets no :hover of its own. Without motion it simply stands.
-export const heartFor = (h: { to: Spot; motion: Motion }): string => {
-  const style = h.motion === 'never' ? '' : `<style>${LOVE}.heart{transform-origin:90px 16px;animation:love 1.8s ease-out infinite}${h.motion === 'auto' ? REDUCED : ''}</style>`
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" width="360" height="96">` +
-    style +
-    `<g transform="translate(${SPOT_X[h.to]} 0)">${view(`<path class="heart" d="${HEART_PATH}" fill="${HEART}"/>`)}</g>` +
-    `</svg>`
-  )
-}
 ```
 
 - [ ] **Step 4: Run the tests and the type check**
@@ -1256,7 +1215,7 @@ Expected: all pass; tsc prints nothing.
 
 ```bash
 git add hooks/stage.ts hooks/stage.test.ts
-git commit -m "Add Mango's three-spot stage and hover heart, with a slide between spots"
+git commit -m "Add Mango's three-spot stage, with a slide between spots"
 ```
 
 ---
@@ -1321,7 +1280,7 @@ In `hooks/stage.ts`:
 1. Change the drawing import to:
 
 ```ts
-import { AMBER, COAT, DEFS, EAR, frontStyle, frontView, HEART, HEART_PATH, LOVE, NOSE, PUPIL, REDUCED, RIM, tailStrokes, WHITE } from './drawing'
+import { AMBER, COAT, DEFS, EAR, frontStyle, frontView, NOSE, PUPIL, REDUCED, RIM, tailStrokes, WHITE } from './drawing'
 ```
 
 2. Add after `view`:
@@ -1562,8 +1521,8 @@ git commit -m "Let Mango walk between spots in a side view of her own"
 - Test: `hooks/mango.test.ts`
 
 **Interfaces:**
-- Consumes: `REST`, `showing` from `hooks/activity.ts`; `heartFor`, `stageFor`, `STAGE_WIDTH`, `STAGE_HEIGHT` from `hooks/stage.ts`; `altFor` from `hooks/drawing.ts`; `Look` via `frameFor`/`faceFor`/`toneFor` from `hooks/cat.ts`.
-- Produces: atoms `stage` (default `REST`), `motion` (default `'auto'`), `gait` (default `'walk'`) in `register.tsx`; the `isStill` atom is gone. `/mango still | move | auto | walk | slide`. The desktop draws `stageFor(...)` at 180 x 48 (90 x 24 short), always as an image (`isInteractive: false`), with `heartFor(...)` at the same size in an absolute Box over it that a hover shows; the terminal draws `frameFor(look)` where `look` follows `showing(...)`.
+- Consumes: `REST`, `showing` from `hooks/activity.ts`; `stageFor`, `STAGE_WIDTH`, `STAGE_HEIGHT` from `hooks/stage.ts`; `altFor` from `hooks/drawing.ts`; `Look` via `frameFor`/`faceFor`/`toneFor` from `hooks/cat.ts`.
+- Produces: atoms `stage` (default `REST`), `motion` (default `'auto'`), `gait` (default `'walk'`) in `register.tsx`; the `isStill` atom is gone. `/mango still | move | auto | walk | slide`. The desktop draws `stageFor(...)` at 180 x 48 (90 x 24 short), always as an image (`isInteractive: false`), with no hover; the terminal draws `frameFor(look)` where `look` follows `showing(...)`.
 
 Behaviour change from v1, by the spec's priority: a timed mood (ruffled, proud) now beats working, so a failed command shows ruffled during the turn instead of after it.
 
@@ -1584,23 +1543,21 @@ In `hooks/mango.test.ts`:
 2b. In `the desktop picture keeps its markup across ticks and changes with the mood`, change `expect(before?.props.isInteractive).toBe(true)` to `toBe(false)` and the comment below it to `// A changed source would restart her animations.` Then add:
 
 ```ts
-test('the desktop draws Mango as an image, with a heart that a hover shows', async ($, on) => {
+test('the desktop draws Mango as one image, with no hover', async ($, on) => {
   mock.clock(on)
   memoryStore(on)
   answerStart(on)
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
-  const [cat, heart] = await ui.findAll({ type: 'Svg' })
-  expect(cat?.props.isInteractive).toBe(false)
-  expect(String(cat?.props.source)).not.toContain('class="heart"')
-  expect(heart?.props.isInteractive).toBe(false)
-  expect(heart?.props.width).toBe(180)
-  expect(heart?.props.height).toBe(48)
-  expect(String(heart?.props.source)).toContain('<g transform="translate(120 0)">')
-  // No key on the holder: the hover then follows the pointer on the keyed Box around her.
-  const holder = (await ui.findAll({ type: 'Box' })).find(b => b.props.position === 'absolute')
-  expect(holder?.key).toBeUndefined()
-  expect(holder?.props).toMatchObject({ top: 0, left: 0, display: 'none', hover: { display: 'flex' } })
+  const svgs = await ui.findAll({ type: 'Svg' })
+  expect(svgs).toHaveLength(1)
+  expect(svgs[0]?.props.isInteractive).toBe(false)
+  expect(svgs[0]?.props.width).toBe(180)
+  expect(svgs[0]?.props.height).toBe(48)
+  expect(String(svgs[0]?.props.source)).not.toContain('class="heart"')
+  // A hover Box drawn absolute shows as a popover card above the band (hover probe, 2026-10-16).
+  const boxes = await ui.findAll({ type: 'Box' })
+  expect(boxes.some(b => b.props.position === 'absolute' || b.props.hover !== undefined)).toBe(false)
 })
 ```
 
@@ -1716,7 +1673,7 @@ import type { Gait, Mood, Motion } from '../types'
 import { REST, showing } from './activity'
 import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS, toneFor } from './cat'
 import { altFor } from './drawing'
-import { heartFor, STAGE_HEIGHT, STAGE_WIDTH, stageFor } from './stage'
+import { STAGE_HEIGHT, STAGE_WIDTH, stageFor } from './stage'
 ```
 
 2. Replace `export const isStill = ...` with:
@@ -1828,19 +1785,14 @@ const setGait = async ($: EngineType, value: Gait): Promise<void> => {
       // Surfaces that draw an Svg get the stage; a short band gets it at half size. The
       // markup follows the stage, pose, motion and gait, never the tick, so her animations
       // run on between periods. Always an image: a frame reloads, and blinks, on every new
-      // source. An image gets no :hover, so the heart is its own picture over her, which
-      // the band shows while the pointer is on the keyed Box around her.
+      // source. An image gets no :hover, so she has no hover heart for now.
       const { Svg } = $.ui.resolve(e)
       const scale = isShort ? 0.5 : 1
       const source = stageFor({ pose: now.pose, activity: now.activity, from: st.from, to: st.to, motion: moves, gait: await read($, gait) })
-      const size = { width: STAGE_WIDTH * scale, height: STAGE_HEIGHT * scale }
       return (
         <Box alignItems="center">
           <Box key="cat">
-            <Svg source={source} alt={altFor(now.pose, now.activity)} {...size} isInteractive={false} />
-            <Box position="absolute" top={0} left={0} display="none" hover={{ display: 'flex' }}>
-              <Svg source={heartFor({ to: st.to, motion: moves })} alt="A heart floats over Mango." {...size} isInteractive={false} />
-            </Box>
+            <Svg source={source} alt={altFor(now.pose, now.activity)} width={STAGE_WIDTH * scale} height={STAGE_HEIGHT * scale} isInteractive={false} />
           </Box>
           {speech}
         </Box>
