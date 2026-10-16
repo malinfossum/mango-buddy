@@ -178,7 +178,7 @@ Written before the code, in `hooks/activity.test.ts`, `hooks/stage.test.ts` and 
 ## Considered and rejected
 
 - **Filenames on a shared screen.** A basename shows in the band, so a screen share shows it too. Accepted: it is only the basename, she says it once per turn, and `/mango mute` hides it.
-- **Writing the line in the same period as the stage.** A remark write redraws the band just as it does in v1 (purr, yawn). Lines are capped at one per 10 s, so batching them with the stage write would add code for no visible gain.
+- **Writing the line in the same period as the activity.** A remark write redraws the band just as it does in v1 (purr, yawn). Lines are capped at one per 10 s, so batching them with the activity write would add code for no visible gain.
 - **A frame for hover.** `isInteractive: true` gives `:hover` inside the picture, but the frame reloads on every new source and blinks (probe, 2026-10-16). Activities swap the picture often, so the blink would show all session.
 - **Two frames overlapped during a swap.** The new frame drawn over the old, the old dropped after a timer. It keeps hover but costs a timer per swap and shows two cats where the poses differ.
 - **Three spots and a walk between them** (built as plan Tasks 6 and 7, then cut, 2026-10-17). A side view in the portrait style and a diagonal trot both looked robotic, and a convincing gait needs jointed legs, shoulder and hip roll and many rounds of tuning at 60 x 48 px. The front view is the drawing that looks like her, so it carries every activity in place.
