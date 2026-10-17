@@ -20,7 +20,7 @@ test('every look moves in its own way', () => {
   for (const look of LOOKS) {
     expect(frontStyle(look), look).toMatch(/@keyframes/)
     expect(frontStyle(look), look).not.toContain('prefers-reduced-motion')
-    // The stage is drawn as an image, which gets no :hover, so its style carries none.
+    // The picture is drawn as an image, which gets no :hover, so its style carries none.
     expect(frontStyle(look), look).not.toContain(':hover')
   }
 })
@@ -34,10 +34,18 @@ test('the activities show in the still picture too', () => {
       expect(view, look).not.toContain('class="heart"')
     }
   }
-  expect(frontView('sniffing', false)).toContain('<g transform="translate(0 5)"><g class="head">')
+  expect(frontView('sniffing', false)).toContain('<g transform="translate(0 11)"><g class="head">')
   expect(frontView('peering', false)).not.toBe(frontView('awake', false))
-  expect(frontView('waiting', false)).not.toContain('#f2a92e')
+  // Closed eyes show no iris.
+  expect(frontView('waiting', false)).not.toContain('url(#iris)')
+  expect(frontView('awake', false)).toContain('url(#iris)')
   expect(frontView('pouncing', false)).toBe(frontView('pouncing', true))
+})
+
+test('her tail turns about the point where it meets her body', () => {
+  expect(frontView('awake', true)).toContain('<g class="tail">')
+  for (const look of ['proud', 'chasing'] as const) expect(frontView(look, true), look).toContain('<g class="tail tail-up">')
+  expect(frontStyle('awake')).toMatch(/\.tail\{transform-origin:[\d.]+px [\d.]+px\}\.tail-up\{transform-origin:[\d.]+px [\d.]+px\}/)
 })
 
 const BASE: PictureInput = { pose: 'awake', activity: null, motion: 'auto' }
@@ -48,7 +56,7 @@ test('the picture is a self-contained ASCII drawing, the same for the same input
       const svg = pictureFor({ ...BASE, motion, activity })
       expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 96" width="120" height="96">')).toBe(true)
       expect(svg.endsWith('</svg>')).toBe(true)
-      expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=|url\((?!#coat\))/i)
+      expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=|url\((?!#coat\)|#iris\))/i)
       expect(svg).toMatch(/^[ -~]+$/)
       expect(svg).toBe(pictureFor({ ...BASE, motion, activity }))
     }

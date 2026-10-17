@@ -69,7 +69,7 @@ test('every pose draws a self-contained svg with its own alt text', () => {
       const svg = drawingFor(pose, isAnimated)
       expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg"'), pose).toBe(true)
       expect(svg.endsWith('</svg>'), pose).toBe(true)
-      expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=|url\((?!#coat\))/i)
+      expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=|url\((?!#coat\)|#iris\))/i)
       expect(svg).toMatch(/^[ -~]+$/)
     }
     alts.add(altFor(pose))

@@ -9,10 +9,10 @@ import { DEFS, frontStyle, frontView, REDUCED } from './drawing'
 export type PictureInput = { pose: Pose; activity: Activity | null; motion: Motion }
 
 const ACT_KEYFRAMES = [
-  '@keyframes pounce{0%,100%{transform:translateY(0) scaleY(1)}25%{transform:translateY(0) scaleY(0.9)}55%{transform:translateY(-6px) scaleY(1.04)}80%{transform:translateY(0) scaleY(0.96)}}',
+  '@keyframes pounce{0%,100%{transform:translateY(0) scaleY(1)}25%{transform:translateY(0) scaleY(0.9)}55%{transform:translateY(-4px) scaleY(1)}80%{transform:translateY(0) scaleY(0.96)}}',
   // Three quick hops on the spot.
   '@keyframes bounce{0%,30%,60%,100%{transform:translateY(0)}15%,45%,75%{transform:translateY(-3px)}}',
-  '@keyframes lash{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(16deg)}}',
+  '@keyframes lash{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(10deg)}}',
   // A crouch squashes her down onto the floor under her paws.
   '.act{transform-origin:52px 94px}',
 ].join('')
