@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 import type { Activity, Mood, Motion } from '../types'
-import { ACTIVITY_TICKS, activityFor, gitStepOf, showing } from './activity'
+import { ACTIVITY_TICKS, activityFor, callLine, gitStepOf, KEEP_WATCH_TICKS, LINE_GAP_TICKS, lineFor, showing, topicOf } from './activity'
+import type { Topic } from './activity'
 import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS, toneFor } from './cat'
 import { altFor, DRAWING_HEIGHT, DRAWING_WIDTH } from './drawing'
 import { pictureFor } from './stage'
@@ -57,6 +58,13 @@ let pendingActivity: Activity | null = null
 let activityUntil = 0
 let runningWaits = 0
 
+// The activity line showing, kept so the end of an activity clears only that line.
+let activityRemark: string | null = null
+// The tick of the last activity line; one per LINE_GAP_TICKS at most.
+let lastLineTick = -LINE_GAP_TICKS
+// What she has named this turn: one line each for reading, editing and the web.
+const namedThisTurn = new Set<Topic>()
+
 // Sets what she does next and restarts its timer. The clock writes it. The same activity
 // writes nothing, so a burst of Reads, or a second commit that returns within one clock
 // period, draws nothing new and never restarts her motion.
@@ -81,6 +89,32 @@ const writeActivity = async ($: EngineType) => {
   if (a === shownActivity) return
   await update($, activity, () => a)
   shownActivity = a
+}
+
+// Shows an activity line: one per LINE_GAP_TICKS at most, and only over an empty remark,
+// the sleep remark or an older activity line, never over a purr, yawn, worried or
+// timed-mood line. The slot is claimed before the first await, so two parallel calls
+// cannot both speak; a line that may not show gives it back.
+const say = async ($: EngineType, line: string) => {
+  const t = clockTick
+  if (t - lastLineTick < LINE_GAP_TICKS) return
+  const before = lastLineTick
+  lastLineTick = t
+  const current = await read($, remark)
+  if (current !== null && current !== sleepRemark && current !== activityRemark) {
+    lastLineTick = before
+    return
+  }
+  activityRemark = line
+  await update($, remark, () => line)
+}
+
+// Clears the activity line if it is still the one showing. The end of an activity calls this.
+const clearActivityRemark = async ($: EngineType) => {
+  if (activityRemark === null) return
+  const line = activityRemark
+  activityRemark = null
+  if ((await read($, remark)) === line) await update($, remark, () => null)
 }
 
 const snapshot = async ($: EngineType, t: number) => ({
@@ -232,6 +266,7 @@ const advanceClock = async ($: EngineType) => {
   lastMood = now
   if (runningWaits === 0 && t >= activityUntil && pendingActivity !== null) {
     pendingActivity = null
+    await clearActivityRemark($)
   }
   await writeActivity($)
 }
@@ -306,7 +341,19 @@ export const register: Register = on => {
   on('tool.call', { tool: ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'WebFetch', 'WebSearch'] }, async ($, e, next) => {
     const a = activityFor(e.tool)
     if (a !== null) setActivity(a)
+    // The first-of-turn flag is spent before the first await, so two parallel calls
+    // cannot both claim it. A call with nothing to name spends it too.
+    let line: string | null = null
+    const topic = topicOf(e.tool)
+    if (topic !== null && !namedThisTurn.has(topic)) {
+      namedThisTurn.add(topic)
+      line = callLine(e, clockTick)
+    }
     await quietly(() => markActivity($))
+    if (line !== null) {
+      const said = line
+      await quietly(() => say($, said))
+    }
     return next(e)
   }).catch(($, e, next) => next(e))
 
@@ -318,6 +365,7 @@ export const register: Register = on => {
   ).catch(($, e, next) => next(e))
 
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    const started = clockTick
     const isTest = isTestCommand(e.command)
     const step = gitStepOf(e.command)
     const ran = await whileWaiting($, async () => {
@@ -332,7 +380,16 @@ export const register: Register = on => {
     }
     if (isTest) await setTimedMood($, 'proud', PROUD_TICKS)
     // A commit or push that went through: she pounces on it, or chases it out.
-    if (step !== null) setActivity(step === 'push' ? 'chasing' : 'pouncing')
+    if (step !== null) {
+      setActivity(step === 'push' ? 'chasing' : 'pouncing')
+      await quietly(() => say($, lineFor(step, clockTick)))
+    }
+    // Measured in clock ticks between the call and its result, so tests can drive it.
+    const ticks = clockTick - started
+    if (ticks > KEEP_WATCH_TICKS) {
+      const seconds = String(Math.round((ticks * TICK_MS) / 1000))
+      await quietly(() => say($, lineFor('watch', clockTick, seconds)))
+    }
     return ran
   }).catch(($, e, next) => next(e))
 
@@ -363,6 +420,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('prompt.submit', async ($, e, next) => {
+    namedThisTurn.clear()
     await markActivity($)
     await update($, remark, () => null)
     return next(e)

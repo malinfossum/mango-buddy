@@ -1,7 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { MockClock, TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
-import { ACTIVITY_TICKS } from './activity'
+import { ACTIVITY_TICKS, LINE_GAP_TICKS } from './activity'
 import { TICK_MS, SLEEP_AFTER_TICKS, RUFFLED_TICKS, PROUD_TICKS, remarkFor } from './cat'
 
 export const BAND = {
@@ -967,4 +967,104 @@ test('a failed bookkeeping write never blocks a tool or leaves her waiting', asy
   expect(runs).toBe(2)
   await clock.advance(TICK_MS * (ACTIVITY_TICKS + 1))
   expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(AWAKE)
+})
+
+const lineOf = async (ui: { find: (q: { key: string }) => Promise<{ text?: string } | undefined> }) => (await ui.find({ key: 'line' }))?.text ?? ''
+
+test('a Read names the file once per turn, and a new prompt lets her say it again', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  on('prompt.submit', (_$, e) => e)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Read', file_path: 'C:\\Users\\someone\\x.ts', tool_use_id: 'l1' })
+  expect(await lineOf(ui)).toBe('Mango sniffs at x.ts.')
+  await clock.advance(TICK_MS * LINE_GAP_TICKS)
+  await $.tool.call({ tool: 'Read', file_path: '/home/a/y.ts', tool_use_id: 'l2' })
+  expect(await lineOf(ui)).toContain('context 0 %')
+  await $.prompt.submit({ text: 'go', wait: false, origin: { kind: 'composer' } })
+  await $.tool.call({ tool: 'Read', file_path: '/home/a/z.ts', tool_use_id: 'l3' })
+  expect(await lineOf(ui)).toContain('z.ts')
+  expect(await lineOf(ui)).not.toContain('home')
+})
+
+test('a Grep names no pattern, and a WebFetch names only the host', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Grep', pattern: 'hunter2', tool_use_id: 'l4' })
+  expect(await lineOf(ui)).toBe('Mango sniffs around the files.')
+  await clock.advance(TICK_MS * LINE_GAP_TICKS)
+  await $.tool.call({ tool: 'WebFetch', url: 'https://user:secret@docs.example.com:8443/a?b=1', prompt: 'p', tool_use_id: 'l5' })
+  expect(await lineOf(ui)).toBe('Mango peers out at docs.example.com.')
+})
+
+test('a second line inside fourteen ticks is dropped, and the line goes when the activity ends', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'l6' })
+  await clock.advance(TICK_MS * 3)
+  await $.tool.call({ tool: 'Edit', file_path: '/r/cat.ts', old_string: 'a', new_string: 'b', tool_use_id: 'l7' })
+  expect(await lineOf(ui)).toBe('Mango sniffs at x.ts.')
+  await clock.advance(TICK_MS * (ACTIVITY_TICKS - 1))
+  expect(await lineOf(ui)).toBe('Mango sniffs at x.ts.')
+  await clock.advance(TICK_MS)
+  expect(await lineOf(ui)).toContain('context 0 %')
+})
+
+test('an activity line never replaces a purr, and its end leaves the purr', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await run($, 'pet')
+  const purr = remarkFor('purr', 0)
+  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'l8' })
+  expect(await lineOf(ui)).toBe(purr)
+  await clock.advance(TICK_MS * (ACTIVITY_TICKS + 1))
+  expect(await lineOf(ui)).toBe(purr)
+})
+
+test('a Bash run of more than forty ticks that succeeds says she kept watch; forty does not', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ ticks: e.command === 'long' ? 41.5 : 40.5 }))
+  await $.session.start(START)
+  const ui = await desktop($)
+  const short = $.tool.call({ tool: 'Bash', command: 'short', tool_use_id: 'l9' })
+  await clock.advance(TICK_MS * 41)
+  await short
+  expect(await lineOf(ui)).toContain('context 0 %')
+  const long = $.tool.call({ tool: 'Bash', command: 'long', tool_use_id: 'l10' })
+  await clock.advance(TICK_MS * 42)
+  await long
+  expect(await lineOf(ui)).toMatch(/^Mango .*\b31 s\.$/)
+})
+
+test('a successful commit or push speaks in the success colour', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "x"', tool_use_id: 'l11' })
+  expect(await lineOf(ui)).toBe('Mango pounces on the commit.')
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Text', text: 'Mango pounces on the commit.' }))?.props.color).toBe('success')
+  await clock.advance(TICK_MS * LINE_GAP_TICKS)
+  await $.tool.call({ tool: 'Bash', command: 'git push', tool_use_id: 'l12' })
+  expect(await lineOf(ui)).toMatch(/^Mango (chases|runs after) the push/)
 })
