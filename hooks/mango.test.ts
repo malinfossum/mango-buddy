@@ -32,6 +32,8 @@ test('the desktop draws a picture of Mango and a line, no ASCII rows', async ($,
   expect(String(cat?.props.source)).toMatch(/^<svg /)
   expect(cat?.props.alt).toBe('Mango, a black cat, is awake.')
   expect(cat?.props.width).toBe(60)
+  expect(cat?.props.height).toBe(48)
+  expect(String(cat?.props.source)).toContain('<g class="act">')
   expect(await ui.find({ key: 'row1' })).toBeUndefined()
   expect(await ui.find({ key: 'line' })).toBeDefined()
 })
@@ -44,8 +46,8 @@ test('the desktop picture keeps its markup across ticks and changes with the moo
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
   const before = await ui.find({ type: 'Svg' })
-  expect(before?.props.isInteractive).toBe(true)
-  // A changed source would reload the frame and restart her animations.
+  expect(before?.props.isInteractive).toBe(false)
+  // A changed source would restart her animations.
   await clock.advance(TICK_MS)
   await clock.advance(TICK_MS)
   expect((await ui.find({ type: 'Svg' }))?.props.source).toBe(before?.props.source)
@@ -53,6 +55,23 @@ test('the desktop picture keeps its markup across ticks and changes with the moo
   const after = await ui.find({ type: 'Svg' })
   expect(after?.props.alt).toBe('Mango, a black cat, is ruffled.')
   expect(after?.props.source).not.toBe(before?.props.source)
+})
+
+test('the desktop draws Mango as one image, with no hover', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const svgs = await ui.findAll({ type: 'Svg' })
+  expect(svgs).toHaveLength(1)
+  expect(svgs[0]?.props.isInteractive).toBe(false)
+  expect(svgs[0]?.props.width).toBe(60)
+  expect(svgs[0]?.props.height).toBe(48)
+  expect(String(svgs[0]?.props.source)).not.toContain('class="heart"')
+  // A hover Box drawn absolute shows as a popover card above the band (hover probe, 2026-10-16).
+  const boxes = await ui.findAll({ type: 'Box' })
+  expect(boxes.some(b => b.props.position === 'absolute' || b.props.hover !== undefined)).toBe(false)
 })
 
 test('an idle desktop band is not redrawn on every tick', async ($, on) => {
@@ -358,15 +377,74 @@ test('/mango mute keeps the cat and drops the speech line', async ($, on) => {
   expect(await ui.find({ key: 'line' })).toBeDefined()
 })
 
-test('/mango still and move toggle the flag', async ($, on) => {
+test('/mango still, move and auto store how she moves and redraw her', async ($, on) => {
   mock.clock(on)
   const data = memoryStore(on)
   answerStart(on)
   await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const cat = async () => (await ui.find({ type: 'Svg' }))?.props
+  expect(String((await cat())?.source)).toContain('prefers-reduced-motion:reduce')
   expect((await run($, 'still')).text).toBe('Mango sits still.')
-  expect(data.get('isStill')).toBe(true)
-  expect((await run($, 'move')).text).toBe('Mango moves again.')
-  expect(data.get('isStill')).toBe(false)
+  expect(data.get('motion')).toBe('never')
+  expect((await cat())?.isInteractive).toBe(false)
+  expect(String((await cat())?.source)).not.toContain('<style>')
+  expect((await run($, 'move')).text).toBe('Mango always moves.')
+  expect(data.get('motion')).toBe('always')
+  expect((await cat())?.isInteractive).toBe(false)
+  expect(String((await cat())?.source)).toContain('<style>')
+  expect(String((await cat())?.source)).not.toContain('prefers-reduced-motion')
+  expect((await run($, 'auto')).text).toBe('Mango follows your system.')
+  expect(data.get('motion')).toBe('auto')
+  expect(String((await cat())?.source)).toContain('prefers-reduced-motion:reduce')
+})
+
+test('an old isStill: true loads as never and is written as motion once', async ($, on) => {
+  mock.clock(on)
+  const data = memoryStore(on, { isStill: true })
+  answerStart(on)
+  await $.session.start(START)
+  expect(data.get('motion')).toBe('never')
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.isInteractive).toBe(false)
+  // Loaded as never: a still picture has no style sheet.
+  expect(String(cat?.props.source)).not.toContain('<style>')
+})
+
+test('a stored motion wins over an old isStill', async ($, on) => {
+  mock.clock(on)
+  const kept = memoryStore(on, { isStill: true, motion: 'always' })
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect(String((await ui.find({ type: 'Svg' }))?.props.source)).not.toContain('prefers-reduced-motion')
+  expect(kept.get('motion')).toBe('always')
+})
+
+test('junk stored settings fall back to auto, and a non-true isStill never migrates', async ($, on) => {
+  mock.clock(on)
+  const data = memoryStore(on, { motion: 'fast', isStill: 'yes' })
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.isInteractive).toBe(false)
+  expect(String(cat?.props.source)).toContain('prefers-reduced-motion:reduce')
+  expect(data.get('motion')).toBe('fast')
+})
+
+test('a timed mood beats working on every surface', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  failBash(on)
+  await $.session.start(START)
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'tw1' })
+  const picture = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: { ...BAND, isWorking: true } })
+  expect((await picture.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
+  const terminal = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: { ...BAND, isWorking: true } })
+  expect((await terminal.find({ key: 'row2' }))?.text).toContain('>.<')
 })
 
 test('stored flags load at session start, and anything but true counts as false', async ($, on) => {
@@ -389,6 +467,7 @@ test('/mango card reports stats; unknown words get help', async ($, on) => {
   await $.turn.complete(TURN)
   expect((await run($, 'card')).text).toBe('Mango · sessions 5 · pets 9 · errors survived 3 · context 12 %')
   expect((await run($, 'dance')).text).toContain('pet')
+  expect((await run($, 'dance')).text).toBe('Mango knows: pet, mute, unmute, still, move, auto, off, on, card.')
 })
 
 test('session.start counts a session once, even when it runs twice', async ($, on) => {

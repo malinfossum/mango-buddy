@@ -1,8 +1,10 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
-import type { Mood } from '../types'
+import type { Activity, Mood, Motion } from '../types'
+import { showing } from './activity'
 import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS, toneFor } from './cat'
-import { altFor, DRAWING_HEIGHT, DRAWING_WIDTH, drawingFor } from './drawing'
+import { altFor, DRAWING_HEIGHT, DRAWING_WIDTH } from './drawing'
+import { pictureFor } from './stage'
 
 type EngineType = EngineInterface
 
@@ -16,7 +18,11 @@ export const isSessionCounted = atom({ plugin: 'mango', key: 'isSessionCounted' 
 export const wasOverBudget = atom({ plugin: 'mango', key: 'wasOverBudget' } as const, false)
 export const isOff = atom({ plugin: 'mango', key: 'isOff' } as const, false)
 export const isMuted = atom({ plugin: 'mango', key: 'isMuted' } as const, false)
-export const isStill = atom({ plugin: 'mango', key: 'isStill' } as const, false)
+// How she moves, stored. Read once in session.start, written on change.
+export const motion = atom({ plugin: 'mango', key: 'motion' } as const, 'auto' as Motion)
+// What the desktop picture shows over her mood. Written at most once per clock period,
+// so a burst of tool calls is one write and one redraw.
+export const activity = atom({ plugin: 'mango', key: 'activity' } as const, null as Activity | null)
 // The mood the picture surfaces draw. They never read the tick, which the clock writes
 // every period: each redraw rebuilds the picture's frame, and that shows as a blink.
 export const shownMood = atom({ plugin: 'mango', key: 'shownMood' } as const, 'awake' as Mood)
@@ -24,6 +30,8 @@ export const shownMood = atom({ plugin: 'mango', key: 'shownMood' } as const, 'a
 const FACE_WIDTH = 5
 
 const flag = (x: unknown): boolean => x === true
+
+const motionOf = (x: unknown): Motion | undefined => (x === 'auto' || x === 'always' || x === 'never' ? x : undefined)
 
 // The clock's own count. In still mode the tick atom is only written on a mood
 // change, so time is kept here and the atom follows it.
@@ -78,7 +86,13 @@ const bump = async ($: EngineType, key: string): Promise<number> => {
   return value
 }
 
-const HELP = 'Mango knows: pet, mute, unmute, still, move, off, on, card.'
+const HELP = 'Mango knows: pet, mute, unmute, still, move, auto, off, on, card.'
+
+// Stores how she moves and redraws her with it.
+const setMotion = async ($: EngineType, value: Motion): Promise<void> => {
+  await $.store.set('motion', value)
+  await update($, motion, () => value)
+}
 
 export const runCommand = async ($: EngineType, args: string): Promise<string> => {
   const word = args.trim().toLowerCase().split(/\s+/)[0] ?? ''
@@ -97,13 +111,14 @@ export const runCommand = async ($: EngineType, args: string): Promise<string> =
       await update($, isMuted, () => false)
       return 'Mango may speak again.'
     case 'still':
-      await $.store.set('isStill', true)
-      await update($, isStill, () => true)
+      await setMotion($, 'never')
       return 'Mango sits still.'
     case 'move':
-      await $.store.set('isStill', false)
-      await update($, isStill, () => false)
-      return 'Mango moves again.'
+      await setMotion($, 'always')
+      return 'Mango always moves.'
+    case 'auto':
+      await setMotion($, 'auto')
+      return 'Mango follows your system.'
     case 'off':
       await $.store.set('isOff', true)
       await update($, isOff, () => true)
@@ -146,7 +161,7 @@ const advanceClock = async ($: EngineType) => {
   }
   const now = resolveMood(s)
   await showMood($, now)
-  if (await read($, isStill)) {
+  if ((await read($, motion)) === 'never') {
     const stored = await read($, tick)
     if (now !== resolveMood({ ...s, tick: stored })) await update($, tick, () => t)
   } else {
@@ -191,15 +206,21 @@ export const register: Register = on => {
     await $.command.register({
       name: 'mango',
       description: 'Pet Mango, or tell her to be still, quiet or away.',
-      argumentHint: 'pet | mute | unmute | still | move | off | on | card',
+      argumentHint: 'pet | mute | unmute | still | move | auto | off | on | card',
     })
 
     const storedOff = flag(await $.store.get('isOff'))
     const storedMuted = flag(await $.store.get('isMuted'))
-    const storedStill = flag(await $.store.get('isStill'))
+    // An old still flag becomes motion: never, written once; isStill is not read after that.
+    let storedMotion = motionOf(await $.store.get('motion'))
+    if (storedMotion === undefined && flag(await $.store.get('isStill'))) {
+      storedMotion = 'never'
+      await $.store.set('motion', storedMotion)
+    }
+    const moves = storedMotion ?? 'auto'
     await update($, isOff, () => storedOff)
     await update($, isMuted, () => storedMuted)
-    await update($, isStill, () => storedStill)
+    await update($, motion, () => moves)
 
     if (!(await read($, isSessionCounted))) {
       await bump($, 'sessions')
@@ -273,20 +294,24 @@ export const register: Register = on => {
     // read the shown mood, so an idle clock period never redraws them.
     const t = isTerminal ? await read($, tick) : 0
     const shown = isTerminal ? resolveMood(await snapshot($, t)) : await read($, shownMood)
-    const still = await read($, isStill)
-    // In still mode the tick can sit on a blink frame (0 % 8), which would draw an awake
-    // cat with closed eyes. Nudge by two so the tail and the z keep their parity.
+    const drawnActivity = await read($, activity)
+    const moves = await read($, motion)
+    const still = moves === 'never'
+    // Still, the tick can sit on a blink frame (0 % 8), which would draw an awake cat with
+    // closed eyes. Nudge by two so the tail and the z keep their parity.
     const drawTick = still && t % 8 === 0 ? t + 2 : t
     const said = await read($, remark)
     const muted = await read($, isMuted)
-    const pose = e.props.isWorking ? 'working' : shown
+    // Priority, highest first: a timed mood, an activity, working, the resting mood.
+    const now = showing(shown, drawnActivity, e.props.isWorking)
+    const look = now.activity ?? now.pose
     const isShort = e.props.maxRows < 3
     // The face is 5 columns wide, the two-row art ART_WIDTH. A band narrower than
     // the art draws the art with an empty line, never a negative slice.
     const room = Math.max(0, e.props.bodyColumns - (isShort ? FACE_WIDTH : ART_WIDTH) - GAP)
     const text = (said ?? `context ${await read($, contextPercent)} %`).slice(0, room)
-    // A remark takes the mood's theme colour; the context figure stays dim.
-    const tone = said === null ? {} : { color: toneFor(pose) }
+    // A remark takes the look's theme colour; the context figure stays dim.
+    const tone = said === null ? {} : { color: toneFor(look) }
     const speech = muted ? null : (
       <>
         <Text>{' '.repeat(GAP)}</Text>
@@ -296,14 +321,16 @@ export const register: Register = on => {
     )
     if (!isTerminal) {
       // Surfaces that draw an Svg get the picture; a short band gets it at half size. The
-      // markup follows the pose, never the tick, so her animations run on between periods.
-      // An interactive frame is what lets CSS motion and hover play; still mode is an image.
+      // markup follows the activity, pose and motion, never the tick, so her animations
+      // run on between periods. Always an image: a frame reloads, and blinks, on every new
+      // source. An image gets no :hover, so she has no hover heart for now.
       const { Svg } = $.ui.resolve(e)
       const scale = isShort ? 0.5 : 1
+      const source = pictureFor({ pose: now.pose, activity: now.activity, motion: moves })
       return (
         <Box alignItems="center">
           <Box key="cat">
-            <Svg source={drawingFor(pose, !still)} alt={altFor(pose)} width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} isInteractive={!still} />
+            <Svg source={source} alt={altFor(now.pose, now.activity)} width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} isInteractive={false} />
           </Box>
           {speech}
         </Box>
@@ -312,12 +339,12 @@ export const register: Register = on => {
     if (isShort) {
       return (
         <Box>
-          <Box key="face"><Text>{faceFor(pose, drawTick)}</Text></Box>
+          <Box key="face"><Text>{faceFor(look, drawTick)}</Text></Box>
           {speech}
         </Box>
       )
     }
-    const [row1, row2] = frameFor(pose, drawTick)
+    const [row1, row2] = frameFor(look, drawTick)
     return (
       <Box flexDirection="column">
         <Box key="row1"><Text>{row1}</Text></Box>

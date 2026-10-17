@@ -18,7 +18,6 @@ declare module 'claude-code' {
       wasOverBudget: boolean
       isOff: boolean
       isMuted: boolean
-      isStill: boolean
       shownMood: Mood
       // What the desktop picture shows over her mood. One atom, so a change is one write and one redraw.
       activity: Activity | null
