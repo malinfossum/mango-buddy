@@ -1,6 +1,6 @@
 import type { Activity, Motion } from '../types'
 import type { Look, Pose } from './cat'
-import { DEFS, frontStyle, frontView, REDUCED } from './drawing'
+import { DEFS, frontStyle, frontView, LASH_KEYFRAMES, REDUCED } from './drawing'
 
 // Mango's picture on the desktop: the front view on its 120 x 96 grid, drawn at 60 x 48
 // where the single drawing sits. She stays in place; a pounce hops and a chase bounces
@@ -12,7 +12,6 @@ const ACT_KEYFRAMES = [
   '@keyframes pounce{0%,100%{transform:translateY(0) scaleY(1)}25%{transform:translateY(0) scaleY(0.9)}55%{transform:translateY(-4px) scaleY(1)}80%{transform:translateY(0) scaleY(0.96)}}',
   // Three quick hops on the spot.
   '@keyframes bounce{0%,30%,60%,100%{transform:translateY(0)}15%,45%,75%{transform:translateY(-3px)}}',
-  '@keyframes lash{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(10deg)}}',
   // A crouch squashes her down onto the floor under her paws.
   '.act{transform-origin:52px 94px}',
 ].join('')
@@ -24,7 +23,7 @@ const actStyle = (activity: Activity | null): string => {
     case 'pouncing':
       return `${ACT_KEYFRAMES}.act{animation:pounce 0.8s ease-out both}`
     case 'chasing':
-      return `${ACT_KEYFRAMES}.act{animation:bounce 1.2s ease-in-out both}.tail{animation:lash 0.3s ease-in-out 4,sway 1s ease-in-out 1.2s infinite}`
+      return `${ACT_KEYFRAMES}${LASH_KEYFRAMES}.act{animation:bounce 1.2s ease-in-out both}.tail{animation:lash 0.3s ease-in-out 4,sway 1s ease-in-out 1.2s infinite}`
     default:
       return ''
   }

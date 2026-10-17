@@ -109,11 +109,37 @@ const plume = (p0: Point, p1: Point, p2: Point, p3: Point, w: number, n: number,
 }
 
 // The low plume starts under her body and curls up along the floor; the raised one stands
-// up behind her for a proud cat or one on a chase.
-const TAIL_LOW = `<path d="${plume([60, 88], [88, 89], [108, 86], [106, 68], 10, 6, 2.2)}" fill="url(#coat)" stroke="${RIM}" stroke-width="1"/>`
-const TAIL_UP = `<path d="${plume([74, 86], [100, 84], [112, 60], [102, 40], 11, 7, 2.6)}" fill="url(#coat)" stroke="${RIM}" stroke-width="1"/>`
+// up behind her for a proud cat or one on a chase. Each is fixed at its root half: a Bend
+// moves only the last two control points, so the tail bends and never slides off her.
+type Bend = [Point, Point]
+const lowPlume = ([p2, p3]: Bend): string => plume([60, 88], [88, 89], p2, p3, 10, 6, 2.2)
+const upPlume = ([p2, p3]: Bend): string => plume([74, 86], [100, 84], p2, p3, 11, 7, 2.6)
+const LOW_REST: Bend = [[108, 86], [106, 68]]
+const UP_REST: Bend = [[112, 60], [102, 40]]
 
-const tail = (isRaised: boolean): string => (isRaised ? `<g class="tail tail-up">${TAIL_UP}</g>` : `<g class="tail">${TAIL_LOW}</g>`)
+const isRaised = (look: Look): boolean => look === 'proud' || look === 'chasing'
+
+const tail = (raised: boolean): string =>
+  `<path class="${raised ? 'tail tail-up' : 'tail'}" d="${raised ? upPlume(UP_REST) : lowPlume(LOW_REST)}" fill="url(#coat)" stroke="${RIM}" stroke-width="1"/>`
+
+// A tail motion is a list of keyframe stops, each with the bend the tail takes there.
+// Every plume has the same points in the same order, so the browser can blend between
+// them; a browser without CSS d just shows the resting tail.
+type Stops = [string, Bend][]
+const LOW_SWAY: Stops = [['0%,100%', [[107, 87], [100, 69]]], ['50%', [[109, 87], [110, 73]]]]
+const UP_SWAY: Stops = [['0%,100%', [[110, 60], [96, 40]]], ['50%', [[112, 62], [106, 43]]]]
+// A flick whips the tip up toward her, then throws it out low.
+const FLICK: Stops = [['0%,100%', LOW_REST], ['25%', [[108, 83], [101, 60]]], ['55%', [[109, 86], [112, 77]]]]
+const SHIVER: Stops = [['0%,100%', [[108, 86], [105, 68]]], ['50%', [[108, 86], [107, 68.5]]]]
+// Only the tip taps: it lifts, drops back and settles.
+const TAP: Stops = [['0%,55%,100%', LOW_REST], ['70%', [[108, 85], [104, 63]]], ['85%', [[108, 86], [107, 70]]]]
+const LASH: Stops = [['0%,100%', [[108, 60], [92, 41]]], ['50%', [[112, 63], [109, 46]]]]
+
+const tailKeyframes = (name: string, raised: boolean, stops: Stops): string =>
+  `@keyframes ${name}{${stops.map(([at, bend]) => `${at}{d:path("${raised ? upPlume(bend) : lowPlume(bend)}")}`).join('')}}`
+
+// A chase lashes the raised tail before it sways on.
+export const LASH_KEYFRAMES = tailKeyframes('lash', true, LASH)
 
 // Sitting tall: a fluffy body, smooth along the floor, with her front legs before it.
 const LEGS = `<path d="M 38.5 70 L 38.5 90 L 48.5 90 L 48.5 72 Z M 65.5 70 L 65.5 90 L 55.5 90 L 55.5 72 Z" fill="${LEG}" stroke="${RIM}" stroke-width="0.8" stroke-linejoin="round"/>`
@@ -269,9 +295,6 @@ const KEYFRAMES = [
   '@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-0.8px)}}',
   '@keyframes sink{0%,100%{transform:translateY(0)}50%{transform:translateY(1.2px)}}',
   '@keyframes blink{0%,44%,48%,86%,89%,92%,100%{transform:scaleY(1)}46%,87.5%,90.5%{transform:scaleY(0.1)}}',
-  '@keyframes sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(7deg)}}',
-  '@keyframes flick{0%,100%{transform:rotate(0)}25%{transform:rotate(16deg)}55%{transform:rotate(-8deg)}}',
-  '@keyframes shiver{0%,100%{transform:rotate(-1.5deg)}50%{transform:rotate(1.5deg)}}',
   '@keyframes twitch-l{0%,58%,66%,100%{transform:rotate(0)}61%{transform:rotate(-14deg)}}',
   '@keyframes twitch-r{0%,22%,30%,100%{transform:rotate(0)}25%{transform:rotate(14deg)}}',
   '@keyframes knead{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}',
@@ -287,15 +310,10 @@ const KEYFRAMES = [
 const LOOK_KEYFRAMES = [
   '@keyframes sniff{0%,100%{transform:translateY(0)}50%{transform:translateY(1.5px)}}',
   '@keyframes follow{0%,100%{transform:translateX(-2.5px)}50%{transform:translateX(2.5px)}}',
-  '@keyframes tap{0%,55%,100%{transform:rotate(0)}70%{transform:rotate(8deg)}85%{transform:rotate(-2deg)}}',
 ].join('')
 
 const ORIGINS = [
   '.body{transform-origin:52px 94px}',
-  // The low plume lies along the floor and turns about a point low by her haunch, where a
-  // sway keeps every tuft off the floor; the raised one turns about its base.
-  '.tail{transform-origin:82px 92px}',
-  '.tail-up{transform-origin:74px 86px}',
   '.eyes,.look{transform-origin:52px 40px}',
   '.ear-l,.perk-l{transform-origin:38px 30px}',
   '.ear-r,.perk-r{transform-origin:66px 30px}',
@@ -312,15 +330,17 @@ export const REDUCED = '@media (prefers-reduced-motion:reduce){*{animation:none!
 
 const motionFor = (look: Look): string => {
   const breath = (name: string, seconds: number) => `.body{animation:${name} ${seconds}s ease-in-out infinite}.head{animation:${name === 'deep' ? 'sink' : 'bob'} ${seconds}s ease-in-out infinite}`
-  const tailMoves = (name: string, seconds: number, timing = 'ease-in-out') => `.tail{animation:${name} ${seconds}s ${timing} infinite}`
+  const raised = isRaised(look)
+  const tailMoves = (name: string, stops: Stops, seconds: number) => `${tailKeyframes(name, raised, stops)}.tail{animation:${name} ${seconds}s ease-in-out infinite}`
+  const sway = raised ? UP_SWAY : LOW_SWAY
   const blink = '.eyes{animation:blink 6.8s linear infinite}'
   const earTwitch = '.ear-l{animation:twitch-l 9s ease-in-out infinite}.ear-r{animation:twitch-r 11s ease-in-out infinite}'
   switch (look) {
     case 'awake':
-      return breath('breathe', 3.2) + tailMoves('sway', 4.4) + blink + earTwitch
+      return breath('breathe', 3.2) + tailMoves('sway', sway, 4.4) + blink + earTwitch
     case 'working':
       return (
-        breath('breathe', 3.2) + tailMoves('sway', 2.6) + blink + earTwitch +
+        breath('breathe', 3.2) + tailMoves('sway', sway, 2.6) + blink + earTwitch +
         '.paw-l{animation:knead 0.9s ease-in-out infinite}.paw-r{animation:knead 0.9s ease-in-out -0.45s infinite}'
       )
     case 'sleeping':
@@ -330,28 +350,28 @@ const motionFor = (look: Look): string => {
         '.z{animation:drift 3.6s ease-out infinite}.z2{animation-delay:-1.2s}.z3{animation-delay:-2.4s}'
       )
     case 'proud':
-      return breath('breathe', 3.2) + tailMoves('sway', 3.6) + '.mark{animation:twinkle 1.6s ease-in-out infinite}'
+      return breath('breathe', 3.2) + tailMoves('sway', sway, 3.6) + '.mark{animation:twinkle 1.6s ease-in-out infinite}'
     case 'ruffled':
-      return breath('breathe', 1.6) + tailMoves('flick', 0.9) + '.mark{animation:pulse 0.6s ease-in-out infinite}'
+      return breath('breathe', 1.6) + tailMoves('flick', FLICK, 0.9) + '.mark{animation:pulse 0.6s ease-in-out infinite}'
     case 'worried':
       return (
-        breath('breathe', 2.2) + tailMoves('shiver', 1.2) + blink +
+        breath('breathe', 2.2) + tailMoves('shiver', SHIVER, 1.2) + blink +
         '.pupil{animation:glance 4s ease-in-out infinite}.mark{animation:drip 2.4s ease-in infinite}'
       )
     case 'sniffing':
       // Head low, nose working: the head dips in quick small sniffs.
-      return '.body{animation:breathe 3.2s ease-in-out infinite}.head{animation:sniff 0.6s ease-in-out infinite}' + tailMoves('sway', 4.4)
+      return '.body{animation:breathe 3.2s ease-in-out infinite}.head{animation:sniff 0.6s ease-in-out infinite}' + tailMoves('sway', sway, 4.4)
     case 'watching':
-      return breath('breathe', 3.2) + tailMoves('sway', 4.4) + blink + '.pupil{animation:follow 2.4s ease-in-out infinite}'
+      return breath('breathe', 3.2) + tailMoves('sway', sway, 4.4) + blink + '.pupil{animation:follow 2.4s ease-in-out infinite}'
     case 'peering':
-      return breath('breathe', 2.6) + tailMoves('sway', 3) + '.ear-l{animation:twitch-l 3s ease-in-out infinite}.ear-r{animation:twitch-r 3.4s ease-in-out infinite}'
+      return breath('breathe', 2.6) + tailMoves('sway', sway, 3) + '.ear-l{animation:twitch-l 3s ease-in-out infinite}.ear-r{animation:twitch-r 3.4s ease-in-out infinite}'
     case 'waiting':
       // She sits with her eyes closed; only the tail tip taps.
-      return breath('breathe', 4) + '.tail{animation:tap 1.4s ease-in-out infinite}'
+      return breath('breathe', 4) + tailMoves('tap', TAP, 1.4)
     case 'pouncing':
-      return breath('breathe', 1.6) + tailMoves('flick', 0.9)
+      return breath('breathe', 1.6) + tailMoves('flick', FLICK, 0.9)
     case 'chasing':
-      return breath('breathe', 1.2) + tailMoves('sway', 1)
+      return breath('breathe', 1.2) + tailMoves('sway', sway, 1)
   }
 }
 
@@ -368,7 +388,7 @@ export const frontView = (look: Look, isAnimated: boolean): string => {
   const face = `${eyes(eyesFor(look))}${FACE}`
   const earPair = ears(earsFor(look))
   return (
-    tail(look === 'proud' || look === 'chasing') +
+    tail(isRaised(look)) +
     BODY +
     PAWS +
     (look === 'sniffing'

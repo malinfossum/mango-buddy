@@ -42,10 +42,24 @@ test('the activities show in the still picture too', () => {
   expect(frontView('pouncing', false)).toBe(frontView('pouncing', true))
 })
 
-test('her tail turns about the point where it meets her body', () => {
-  expect(frontView('awake', true)).toContain('<g class="tail">')
-  for (const look of ['proud', 'chasing'] as const) expect(frontView(look, true), look).toContain('<g class="tail tail-up">')
-  expect(frontStyle('awake')).toMatch(/\.tail\{transform-origin:[\d.]+px [\d.]+px\}\.tail-up\{transform-origin:[\d.]+px [\d.]+px\}/)
+test('her tail bends from a root that stays where it meets her body', () => {
+  expect(frontView('awake', true)).toContain('<path class="tail" ')
+  for (const look of ['proud', 'chasing'] as const) expect(frontView(look, true), look).toContain('<path class="tail tail-up" ')
+  const letters = (d: string) => d.replace(/[^A-Z]/g, '')
+  for (const look of LOOKS) {
+    const rest = /class="tail[^"]*" d="([^"]+)"/.exec(frontView(look, true))?.[1] ?? ''
+    // A chase's picture also carries the lash.
+    const style = look === 'chasing' ? pictureFor({ pose: 'awake', activity: 'chasing', motion: 'always' }) : frontStyle(look)
+    const shapes = [...style.matchAll(/d:path\("([^"]+)"\)/g)].map(m => m[1] ?? '')
+    // Asleep, her tail lies still.
+    expect(shapes.length > 0, look).toBe(look !== 'sleeping')
+    expect(style, look).not.toMatch(/\.tail(-up)?\{transform-origin/)
+    for (const d of shapes) {
+      // The same first point and the same commands: pinned at the root, and blendable.
+      expect(d.split(' Q')[0], look).toBe(rest.split(' Q')[0])
+      expect(letters(d), look).toBe(letters(rest))
+    }
+  }
 })
 
 const BASE: PictureInput = { pose: 'awake', activity: null, motion: 'auto' }
