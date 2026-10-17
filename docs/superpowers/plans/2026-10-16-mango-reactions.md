@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Mango reacts to Claude's tool calls: she sniffs, watches, peers, waits, pounces and chases on a three-spot stage on desktop, with new faces in the terminal and a short line at notable moments.
+**Goal:** Mango reacts to Claude's tool calls: she sniffs, watches, peers, waits, pounces and chases in place on desktop, drawn from photos of the real Mango, with new faces in the terminal and a short line at notable moments.
 
-**Architecture:** Two new pure modules. `hooks/activity.ts` maps tool calls to activities, spots, names and lines. `hooks/stage.ts` builds the desktop picture: the front view from `hooks/drawing.ts` on one of three spots, a walk between them, and a new side view. `hooks/register.tsx` keeps the timers in module state and writes one `stage` atom at most once per clock period. The terminal gets activity rows in `hooks/cat.ts`.
+**Architecture:** Two new pure modules. `hooks/activity.ts` maps tool calls to activities, names and lines. `hooks/stage.ts` builds the desktop picture: the front view from `hooks/drawing.ts` with the activity's look and motion, in the place v1 draws her. `hooks/register.tsx` keeps the timers in module state and writes one `activity` atom at most once per clock period. The terminal gets activity rows in `hooks/cat.ts`.
+
+**Amended 2026-10-17:** the spec dropped the spots, the walk and the side view (she stays centred) and the front view is redrawn from photos. Tasks 6 and 7 were built and are cut back by the new Task 8; the new Task 9 builds the portrait; the old Tasks 8 to 11 are now Tasks 10 to 13.
 
 **Tech Stack:** Claude Code function hooks (TypeScript/TSX compiled by the engine), `claude plugin test` with `claude-code/testing`, `claude plugin validate`, `npx -p typescript tsc -p . --noEmit`. No npm dependencies. Browser checks in the `/tmp/mango-render` harness (Node 26 plus headless Brave over CDP).
 
@@ -16,8 +18,8 @@
 - Only a file's basename (Read, Edit, Write) and a web host (WebFetch) reach the band. Never full paths, Grep or Glob patterns, search queries, command text or output.
 - A name is everything after the last `/` or `\`, then printable ASCII (`0x20` to `0x7e`, anything else becomes `?`), at most 32 characters (longer ends in `...`).
 - An activity lasts 6 ticks (4.5 s) after its last call. At most one activity line per 14 ticks (about 10 s). Keep-watch needs more than 40 ticks (30 s).
-- `stage` is written in one write, at most once per clock period, and only when it changes. The picture reads `stage`, `shownMood`, `motion`, `gait`, never `tick`.
-- Stage: one Svg of 180 x 48 px drawn on a 360 x 96 grid; spots left (x 0), middle (x 120), right (x 240); a short band draws it at half size. The move takes 1.2 s.
+- `activity` is written at most once per clock period, and only when it changes. The picture reads `activity`, `shownMood`, `motion`, never `tick`.
+- Picture: one Svg of 60 x 48 px, the front view on its 120 x 96 grid, where v1 draws her; a short band draws it at half size. She never leaves that place: a pounce hops and a chase bounces in place.
 - Every new hook ends in `.catch(($, e, next) => next(e))`. Bookkeeping around a tool call runs in a try/catch, so a failed write never blocks the call.
 - Engine names come from `.claude-plugin/types/claude-code/index.d.ts`, never from memory. Atoms take a string-literal plugin name (`plugin: 'mango'`). `Text` has no `key`, so a test finds a `<Box key>` around it.
 - Never ask Malin to turn on Windows animation effects. Motion is checked in the `/tmp/mango-render` harness only.
@@ -27,11 +29,11 @@
 
 ## Review Focus
 
-1. A Bash or Agent call that runs past two minutes: she must not fall asleep while it runs, and must not drop asleep the moment it ends (Task 9, "a long run never puts her to sleep").
+1. A Bash or Agent call that runs past two minutes: she must not fall asleep while it runs, and must not drop asleep the moment it ends (Task 11, "a long run never puts her to sleep").
 2. A path with no file name (`C:\repo\`, `/`, an empty string) must give no line rather than a folder name or `Mango sniffs at .` (Task 3, `baseName` cases; Task 3, `callLine` with `/r/`).
-3. A failed bookkeeping write (`state.set` throwing) during a Bash call must still run the tool exactly once and must not leave `runningWaits` above zero, which would keep her waiting forever (Task 9, "a failed bookkeeping write").
-4. Stored settings with junk values (`motion: 'fast'`, `gait: 7`, `isStill: 'yes'`) must fall back to the defaults and never migrate a non-`true` still flag (Task 8, "junk falls back").
-5. A Bash call that ends exactly at the keep-watch bound (40 ticks) must stay silent; only more than 40 ticks speaks (Task 10, "keeps watch").
+3. A failed bookkeeping write (`state.set` throwing) during a Bash call must still run the tool exactly once and must not leave `runningWaits` above zero, which would keep her waiting forever (Task 11, "a failed bookkeeping write").
+4. Stored settings with junk values (`motion: 'fast'`, `isStill: 'yes'`) must fall back to the default and never migrate a non-`true` still flag (Task 10, "junk falls back").
+5. A Bash call that ends exactly at the keep-watch bound (40 ticks) must stay silent; only more than 40 ticks speaks (Task 12, "keeps watch").
 
 ---
 
@@ -1038,483 +1040,307 @@ git commit -m "Give Mango's front view a look for each activity"
 
 ---
 
-### Task 6: The stage, with the slide gait
+### Task 6: The stage, with the slide gait (DONE 2026-10-16, cut by Task 8)
+
+Built in `40c24a8..690ac32`: `stageFor` in `hooks/stage.ts`, three spots on a 360 x 96 grid and the slide gait. The spec amendment of 2026-10-17 dropped the spots, so Task 8 cuts this code back to one picture in place. The full steps are in git history: `git show 25cbec3:docs/superpowers/plans/2026-10-16-mango-reactions.md`.
+
+---
+
+### Task 7: The walk: a side view with a trot (DONE 2026-10-16, cut by Task 8)
+
+Built in `690ac32..56b8954`: the side view and its trot in `hooks/stage.ts`, checked in `/tmp/mango-render/stage-check.mjs`. Malin found the side view and the trot robotic, so the spec amendment of 2026-10-17 dropped walking. Task 8 removes the side view. The full steps are in git history (see Task 6).
+
+---
+
+### Task 8: One picture in place: cut the spots, the walk and the side view
 
 **Files:**
-- Create: `hooks/stage.ts`
-- Test: `hooks/stage.test.ts`
+- Modify: `types/index.d.ts`
+- Modify: `hooks/activity.ts`, `hooks/activity.test.ts`
+- Modify: `hooks/stage.ts`, `hooks/stage.test.ts`
 
 **Interfaces:**
-- Consumes: `frontView`, `frontStyle`, `DEFS`, `REDUCED` from `hooks/drawing.ts`; `Look`, `Pose` from `hooks/cat.ts`; `Activity`, `Gait`, `Motion`, `Spot` from `types/index.d.ts`.
-- Produces: `STAGE_WIDTH = 180`, `STAGE_HEIGHT = 48`, `type StageInput = { pose: Pose; activity: Activity | null; from: Spot; to: Spot; motion: Motion; gait: Gait }`, `stageFor(s: StageInput): string`. In this task both gaits move the front view (the slide); Task 7 gives `walk` its own drawing.
+- Consumes: `DEFS`, `frontStyle`, `frontView`, `REDUCED` from `hooks/drawing.ts`; `Look`, `Pose` from `hooks/cat.ts`.
+- Produces: `pictureFor({ pose, activity, motion })` and the type `PictureInput` in `hooks/stage.ts`. The types `Spot`, `Gait` and `Stage` are gone; the state contract has `activity: Activity | null` in place of `stage`, and no `gait`. `hooks/activity.ts` loses `REST`, `spotFor`, `nextStage`, `restStage` and `sameStage`. Nothing outside these files uses any of them yet (Task 10 is the first to wire the picture to state).
 
-Markup, so later tasks and tests can rely on it: `<g class="spot" transform="translate(X 0)">` holds `<g class="act">`, which holds `<g class="front">` around a nested 120 x 96 `<svg>`. The nested viewport keeps every transform origin of the front view where it is on the single drawing.
+The picture is the front view on its 120 x 96 grid, drawn at 60 x 48 by the band (Task 10), the same size and place as v1. A pounce hops and a chase bounces inside `<g class="act">`, once per picture. The chase also lashes its tail four times, then the tail sways on as the chasing look has it.
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `hooks/stage.test.ts`, and add `import { stageFor } from './stage'` and `import type { StageInput } from './stage'` to its imports:
+In `hooks/stage.test.ts`:
+
+1. Change the stage imports to:
 
 ```ts
-const BASE: StageInput = { pose: 'awake', activity: null, from: 'middle', to: 'middle', motion: 'auto', gait: 'slide' }
+import { pictureFor } from './stage'
+import type { PictureInput } from './stage'
+```
 
-test('the stage is a self-contained ASCII picture, the same for the same inputs', () => {
+2. Keep the first three tests (`altFor names each activity...`, `every look moves in its own way`, `the activities show in the still picture too`). Replace everything from `const BASE: StageInput = ...` to the end of the file with:
+
+```ts
+const BASE: PictureInput = { pose: 'awake', activity: null, motion: 'auto' }
+
+test('the picture is a self-contained ASCII drawing, the same for the same inputs', () => {
   for (const motion of ['auto', 'always', 'never'] as const) {
     for (const activity of [null, ...ACTIVITIES]) {
-      const svg = stageFor({ ...BASE, motion, activity, from: 'left', to: 'right' })
-      expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" width="360" height="96">')).toBe(true)
+      const svg = pictureFor({ ...BASE, motion, activity })
+      expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 96" width="120" height="96">')).toBe(true)
       expect(svg.endsWith('</svg>')).toBe(true)
       expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=|url\((?!#coat\))/i)
       expect(svg).toMatch(/^[ -~]+$/)
-      expect(svg).toBe(stageFor({ ...BASE, motion, activity, from: 'left', to: 'right' }))
+      expect(svg).toBe(pictureFor({ ...BASE, motion, activity }))
     }
   }
 })
 
-test('she rests on her spot by its own attribute, and walks only when the spot changes', () => {
-  for (const [to, x] of [['left', 0], ['middle', 120], ['right', 240]] as const) {
-    const svg = stageFor({ ...BASE, from: to, to })
-    expect(svg).toContain(`<g class="spot" transform="translate(${x} 0)">`)
-    expect(svg).not.toContain('@keyframes move')
+test('she stays in place: no spots, no walk and no side view', () => {
+  for (const motion of ['auto', 'always', 'never'] as const) {
+    for (const activity of [null, ...ACTIVITIES]) {
+      const svg = pictureFor({ ...BASE, motion, activity })
+      expect(svg, `${motion} ${activity}`).toContain('<g class="act">')
+      expect(svg, `${motion} ${activity}`).not.toMatch(/class="(spot|side-[rl]|leg-[ab])"|@keyframes (move|dash|trot|slide-bob)/)
+    }
   }
-  const moving = stageFor({ ...BASE, activity: 'peering', from: 'left', to: 'right' })
-  expect(moving).toContain('<g class="spot" transform="translate(240 0)">')
-  expect(moving).toContain('@keyframes move{from{transform:translateX(0px)}to{transform:translateX(240px)}}')
-  expect(moving).toContain('.spot{animation:move 1.2s linear both}')
 })
 
 test('motion decides the style sheet and the reduced-motion query', () => {
-  const never = stageFor({ ...BASE, motion: 'never', activity: 'peering', from: 'left', to: 'right' })
-  expect(never).not.toContain('<style>')
-  expect(never).toContain('<g class="spot" transform="translate(240 0)">')
-  expect(stageFor({ ...BASE, motion: 'always' })).toContain('<style>')
-  expect(stageFor({ ...BASE, motion: 'always' })).not.toContain('prefers-reduced-motion')
-  expect(stageFor({ ...BASE, motion: 'auto' })).toContain('prefers-reduced-motion:reduce')
+  expect(pictureFor({ ...BASE, motion: 'never', activity: 'peering' })).not.toContain('<style>')
+  expect(pictureFor({ ...BASE, motion: 'always' })).toContain('<style>')
+  expect(pictureFor({ ...BASE, motion: 'always' })).not.toContain('prefers-reduced-motion')
+  expect(pictureFor({ ...BASE, motion: 'auto' })).toContain('prefers-reduced-motion:reduce')
   for (const motion of ['auto', 'always', 'never'] as const) {
-    expect(stageFor({ ...BASE, motion }), motion).not.toContain('class="heart"')
+    expect(pictureFor({ ...BASE, motion }), motion).not.toContain('class="heart"')
+    expect(pictureFor({ ...BASE, motion }), motion).not.toContain(':hover')
   }
 })
 
-test('a slide carries the front view with a bob and stepping paws', () => {
-  const slide = stageFor({ ...BASE, motion: 'always', activity: 'sniffing', from: 'middle', to: 'left' })
-  expect(slide).toContain('slide-bob 0.3s ease-in-out 0s 4')
-  expect(slide).toContain('.paw-l{animation:knead 0.3s ease-in-out 0s 4}')
-  expect(slide).toContain('.paw-r{animation:knead 0.3s ease-in-out 0.15s 4}')
-  expect(stageFor({ ...BASE, motion: 'always', activity: 'sniffing', from: 'left', to: 'left' })).not.toContain('slide-bob 0.3s')
+test('a pounce hops in place, once', () => {
+  expect(pictureFor({ ...BASE, motion: 'always', activity: 'pouncing' })).toContain('.act{animation:pounce 0.8s ease-out both}')
+  expect(pictureFor({ ...BASE, motion: 'never', activity: 'pouncing' })).not.toContain('pounce')
 })
 
-test('a pounce or a chase plays once, after the walk to the middle', () => {
-  expect(stageFor({ ...BASE, motion: 'always', activity: 'pouncing' })).toContain('.act{animation:pounce 0.8s ease-out 0s both}')
-  expect(stageFor({ ...BASE, motion: 'always', activity: 'pouncing', from: 'left' })).toContain('.act{animation:pounce 0.8s ease-out 1.2s both}')
-  const chase = stageFor({ ...BASE, motion: 'always', activity: 'chasing', from: 'right' })
-  expect(chase).toContain('@keyframes dash{0%,100%{transform:translateX(0)}50%{transform:translateX(120px)}}')
-  expect(chase).toContain('.act{animation:dash 1.2s ease-in-out 1.2s both}')
-  const still = stageFor({ ...BASE, motion: 'never', activity: 'pouncing', from: 'left' })
-  expect(still).not.toContain('pounce')
-  expect(still).toContain('<g class="spot" transform="translate(120 0)">')
+test('a chase bounces in place with a lashing tail, once, and then the tail sways on', () => {
+  const chase = pictureFor({ ...BASE, motion: 'always', activity: 'chasing' })
+  expect(chase).toContain('.act{animation:bounce 1.2s ease-in-out both}')
+  expect(chase).toContain('.tail{animation:lash 0.3s ease-in-out 4,sway 1s ease-in-out 1.2s infinite}')
+  expect(pictureFor({ ...BASE, motion: 'never', activity: 'chasing' })).not.toContain('bounce')
+})
+
+test('only a pounce or a chase moves her whole body', () => {
+  for (const activity of [null, 'sniffing', 'watching', 'peering', 'waiting'] as const) {
+    expect(pictureFor({ ...BASE, motion: 'always', activity }), String(activity)).not.toContain('.act{animation')
+  }
 })
 ```
+
+In `hooks/activity.test.ts`, change the import to:
+
+```ts
+import { activityFor, baseName, callLine, gitStepOf, hostOf, lineFor, MOMENTS, showing, topicOf } from './activity'
+```
+
+and delete the three spot tests: `each activity takes her to its spot, and waiting keeps hers`, `a new activity starts where she stands; the same one changes nothing` and `an ended activity leaves her on the spot she reached`.
 
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `claude plugin test .`
-Expected: FAIL: the module `./stage` does not exist.
+Expected: FAIL: `pictureFor` is not exported from `./stage`.
 
-- [ ] **Step 3: Write the stage**
+- [ ] **Step 3: Cut the stage from the contract**
 
-Create `hooks/stage.ts`:
+In `types/index.d.ts`, replace everything from `// Her three places on the desktop stage.` down to the `Stage` type with:
 
 ```ts
-import type { Activity, Gait, Motion, Spot } from '../types'
+// auto follows the system's reduced-motion setting; always ignores it; never is a still image.
+export type Motion = 'auto' | 'always' | 'never'
+```
+
+and in the `mango` state replace the lines `stage: Stage`, `motion: Motion` and `gait: Gait` with:
+
+```ts
+      // What the desktop picture shows over her mood. One atom, so a change is one write and one redraw.
+      activity: Activity | null
+      motion: Motion
+```
+
+- [ ] **Step 4: Cut the spots from the activity module**
+
+In `hooks/activity.ts`:
+
+1. Change the first import to `import type { Activity, Mood } from '../types'`.
+2. Change the header comment to:
+
+```ts
+// What Mango does while Claude works. Pure: the hooks in register.tsx keep the timers and
+// write the atoms.
+```
+
+3. Delete `REST`, `spotFor`, `nextStage`, `restStage` and `sameStage`, with their comments. `showing` and everything below it stay as they are.
+
+- [ ] **Step 5: Replace the stage with one picture**
+
+Replace the whole of `hooks/stage.ts` with:
+
+```ts
+import type { Activity, Motion } from '../types'
 import type { Look, Pose } from './cat'
 import { DEFS, frontStyle, frontView, REDUCED } from './drawing'
 
-// Mango's stage on the picture surfaces: three spots, each as wide as she is, on a
-// 360 x 96 grid shown at half that. A new picture walks her once from the spot she was
-// on to the new one; without motion she simply stands on the new spot. Pure: the same
-// inputs give the same string.
+// Mango's picture on the desktop: the front view on its 120 x 96 grid, drawn at 60 x 48
+// where the single drawing sits. She stays in place; a pounce hops and a chase bounces
+// there, once per picture. Pure: the same inputs give the same string.
 
-export const STAGE_WIDTH = 180
-export const STAGE_HEIGHT = 48
+export type PictureInput = { pose: Pose; activity: Activity | null; motion: Motion }
 
-export type StageInput = { pose: Pose; activity: Activity | null; from: Spot; to: Spot; motion: Motion; gait: Gait }
-
-const SPOT_X: Record<Spot, number> = { left: 0, middle: 120, right: 240 }
-const RIGHT_EDGE = 240
-
-// Seconds.
-const MOVE = 1.2
-const DASH = 1.2
-const POUNCE = 0.8
-const BOB = 0.3
-
-// Seconds as CSS writes them, rounded so 1.2 + 0.6 never prints as 1.7999999999999998s.
-const sec = (n: number): string => `${Math.round(n * 100) / 100}s`
-
-// Each view sits in a 120 x 96 viewport of its own, so the drawing's transform origins
-// stay where they are on the single picture wherever the stage puts her.
-const view = (inner: string): string => `<svg width="120" height="96" viewBox="0 0 120 96" overflow="visible">${inner}</svg>`
-
-const STAGE_KEYFRAMES = [
-  '@keyframes slide-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.5px)}}',
+const ACT_KEYFRAMES = [
   '@keyframes pounce{0%,100%{transform:translateY(0) scaleY(1)}25%{transform:translateY(0) scaleY(0.9)}55%{transform:translateY(-6px) scaleY(1.04)}80%{transform:translateY(0) scaleY(0.96)}}',
-  // A crouch squashes her down onto the floor of the stage.
-  '.act{transform-origin:0 96px}',
+  // Three quick hops on the spot.
+  '@keyframes bounce{0%,30%,60%,100%{transform:translateY(0)}15%,45%,75%{transform:translateY(-3px)}}',
+  '@keyframes lash{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(16deg)}}',
+  // A crouch squashes her down onto the floor under her paws.
+  '.act{transform-origin:52px 94px}',
 ].join('')
 
-const stageStyle = (s: StageInput): string => {
-  const anims = new Map<string, string[]>()
-  const add = (selector: string, animation: string) => anims.set(selector, [...(anims.get(selector) ?? []), animation])
-  const rules = [STAGE_KEYFRAMES]
-
-  // How she travels for `seconds` from `delay` on: the front view bobs and her paws step.
-  const travel = (delay: number, seconds: number) => {
-    const steps = Math.round(seconds / BOB)
-    add('.front', `slide-bob ${sec(BOB)} ease-in-out ${sec(delay)} ${steps}`)
-    add('.paw-l', `knead ${sec(BOB)} ease-in-out ${sec(delay)} ${steps}`)
-    add('.paw-r', `knead ${sec(BOB)} ease-in-out ${sec(delay + BOB / 2)} ${steps}`)
+// Only a pounce or a chase moves her whole body. A chase is four lashes of the tail long
+// (4 x 0.3 s = 1.2 s); after it the tail sways on as the chasing look has it.
+const actStyle = (activity: Activity | null): string => {
+  switch (activity) {
+    case 'pouncing':
+      return `${ACT_KEYFRAMES}.act{animation:pounce 0.8s ease-out both}`
+    case 'chasing':
+      return `${ACT_KEYFRAMES}.act{animation:bounce 1.2s ease-in-out both}.tail{animation:lash 0.3s ease-in-out 4,sway 1s ease-in-out 1.2s infinite}`
+    default:
+      return ''
   }
-
-  let start = 0
-  if (s.from !== s.to) {
-    rules.push(`@keyframes move{from{transform:translateX(${SPOT_X[s.from]}px)}to{transform:translateX(${SPOT_X[s.to]}px)}}`)
-    add('.spot', `move ${sec(MOVE)} linear both`)
-    travel(0, MOVE)
-    start = MOVE
-  }
-  // A pounce or a chase starts once she has reached her spot, and plays once.
-  if (s.activity === 'pouncing') add('.act', `pounce ${sec(POUNCE)} ease-out ${sec(start)} both`)
-  if (s.activity === 'chasing') {
-    rules.push(`@keyframes dash{0%,100%{transform:translateX(0)}50%{transform:translateX(${RIGHT_EDGE - SPOT_X[s.to]}px)}}`)
-    add('.act', `dash ${sec(DASH)} ease-in-out ${sec(start)} both`)
-    travel(start, DASH)
-  }
-  for (const [selector, list] of anims) rules.push(`${selector}{animation:${list.join(',')}}`)
-  return rules.join('')
 }
 
-export const stageFor = (s: StageInput): string => {
-  const look: Look = s.activity ?? s.pose
-  const isAnimated = s.motion !== 'never'
-  const style = isAnimated ? `<style>${frontStyle(look)}${stageStyle(s)}${s.motion === 'auto' ? REDUCED : ''}</style>` : ''
-  return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" width="360" height="96">` +
-    DEFS +
-    style +
-    `<g class="spot" transform="translate(${SPOT_X[s.to]} 0)"><g class="act">` +
-    `<g class="front">${view(frontView(look, isAnimated))}</g>` +
-    `</g></g></svg>`
-  )
+export const pictureFor = (p: PictureInput): string => {
+  const look: Look = p.activity ?? p.pose
+  const isAnimated = p.motion !== 'never'
+  const style = isAnimated ? `<style>${frontStyle(look)}${actStyle(p.activity)}${p.motion === 'auto' ? REDUCED : ''}</style>` : ''
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 96" width="120" height="96">${DEFS}${style}<g class="act">${frontView(look, isAnimated)}</g></svg>`
 }
 ```
 
-- [ ] **Step 4: Run the tests and the type check**
+The chase's `.tail` rule comes after `frontStyle`'s, so it wins; the reduced-motion query comes last and stops both with `!important`.
 
-Run: `claude plugin test .` then `npx -p typescript tsc -p . --noEmit`
-Expected: all pass; tsc prints nothing.
+- [ ] **Step 6: Run the tests, the type check and a sweep for leftovers**
 
-- [ ] **Step 5: Commit**
+Run: `claude plugin test .` then `npx -p typescript tsc -p . --noEmit`, then:
 
 ```bash
-git add hooks/stage.ts hooks/stage.test.ts
-git commit -m "Add Mango's three-spot stage, with a slide between spots"
+grep -rnE "\bSpot\b|\bGait\b|\bStage\b|stageFor|STAGE_|spotFor|nextStage|restStage|sameStage|\bREST\b|side-[rl]|gait" hooks types || echo "no leftovers"
+```
+
+Expected: all tests pass (read the count off the output: 82 before this task, minus 3 activity and 8 stage tests, plus 6 new, gives 77); tsc prints nothing; `no leftovers`.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add types/index.d.ts hooks/activity.ts hooks/activity.test.ts hooks/stage.ts hooks/stage.test.ts
+git commit -m "Keep Mango in one place: cut the spots, the walk and the side view"
 ```
 
 ---
 
-### Task 7: The walk: a side view with a trot
+### Task 9: Mango's portrait in the front view (controller, with Malin)
+
+Runs in the controller, not a subagent: it ports an approved drawing, and it is done only when the renders match the mockup and Malin says yes.
 
 **Files:**
-- Modify: `hooks/stage.ts`
-- Test: `hooks/stage.test.ts`
-- Create (harness, outside the repo): `/tmp/mango-render/ts-ext.mjs`, `/tmp/mango-render/stage-check.mjs`
+- Modify: `hooks/drawing.ts`
+- Test: `hooks/stage.test.ts`, `hooks/cat.test.ts`
+- Modify (generated): `assets/bands.svg` and the README mood-card drawings, through `/tmp/mango-render/readme-art.mjs`
+- Read only (outside the repo): `/tmp/mango-render/design/mock.mjs`, the approved mockup. Its round-3 code (`fluff`, `plume`, `bib`, `head`, `EARS3`/`ears3`, `eyes3`, `face`, `mitten`, `tailLow`, `tailUp`, `legs`, `look3`, `COATS.black`) is the source of every shape and colour.
+- Harness (outside the repo): `/tmp/mango-render/design/build-check.mjs` (new, throwaway), `poses.mjs`
 
 **Interfaces:**
-- Consumes: `COAT`, `RIM`, `EAR`, `WHITE`, `AMBER`, `PUPIL`, `NOSE`, `tailStrokes` from `hooks/drawing.ts`.
-- Produces: with `gait: 'walk'` and motion allowed, a moving or chasing stage holds `<g class="side-r" opacity="0">` and `<g class="side-l" opacity="0">` (the same side view, mirrored) beside `.front`. `.side-r`/`.side-l` show (`shown`) while she travels that way and `.front` hides (`hidden`) for the same time. A slide, a picture without a move or a chase, and `never` hold no side view.
+- Consumes: Task 8's `pictureFor` (unchanged by this task, unless Step 4 lowers the pounce or the lash in `hooks/stage.ts`).
+- Produces: the same exports `drawing.ts` has today, with `AMBER` renamed `EYE`. `NOSE`, `EAR` and `tailStrokes` stop being exported (Task 8 removed their last user outside the file); delete any that the new drawing no longer uses.
+
+What stays, because the motion, the tests and the README art rely on it:
+- Every class name: `tail`, `body`, `paw-l`, `paw-r`, `head`, `perk-l`, `ear-l`, `perk-r`, `ear-r`, `look`, `eyes`, `pupil`, `mark`, `z z1` to `z z3`, `heart`.
+- `KEYFRAMES`, `LOOK_KEYFRAMES`, `HOVER`, `REDUCED`, `motionFor`, `mark`, `heart`, `earsFor`, `eyesFor` and `altFor`, unchanged.
+- Every transform origin in `ORIGINS` except the tail's, which moves to where the new plume meets her body (see Step 2).
+
+What changes: the shapes and colours, all read off `look3(COATS.black, ...)` in the mockup:
+- `DEFS`: the coat gradient takes the black coat's stops (`COATS.black.stops`), and a second radial gradient `iris` joins it. `RIM` becomes the black coat's rim.
+- Body: the fluffy outline (`fluff(52, 79, 26, 16, 16, ...)`) plus the legs, in one `<g class="body">`.
+- Paws: the two mittens, each in its own `paw-l` / `paw-r` group.
+- Tail: the low plume, or the raised plume for proud and chasing, in `<g class="tail">` (raised: `<g class="tail tail-up">`).
+- Head group (`<g class="head">`): `ears3` for the look's ears (each side wrapped in `perk-*` and `ear-*` groups as today), the fluffy head, the bib, the eyes and the face (nose, mouth, cheek and brow whiskers).
+- Eyes: `eyes3`'s open, closed, wide, happy and squint, wrapped in `look` and `eyes` as today. In open and wide eyes the pupil and its glint sit in `<g class="pupil">`, so watching and worried still move them.
+- Sniffing: the bib stays on her chest, drawn before the head; the head group without the bib drops by `translate(0 11)` (it was 5).
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `hooks/stage.test.ts`:
+In `hooks/stage.test.ts`, in `the activities show in the still picture too`:
 
 ```ts
-test('walking shows the side view while she moves, facing her way, then the front again', () => {
-  const right = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'peering', from: 'middle', to: 'right' })
-  expect(right).toContain('<g class="side-r" opacity="0">')
-  expect(right).toContain('<g class="side-l" opacity="0"><g transform="translate(120 0) scale(-1 1)">')
-  expect(right).toContain('.side-r{animation:shown 1.2s linear 0s}')
-  expect(right).toContain('.front{animation:hidden 1.2s linear 0s}')
-  expect(right).not.toContain('.side-l{animation')
-  expect(right).not.toContain('slide-bob 0.3s')
-  const left = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'sniffing', from: 'middle', to: 'left' })
-  expect(left).toContain('.side-l{animation:shown 1.2s linear 0s}')
-  expect(left).not.toContain('.side-r{animation')
-})
+  expect(frontView('sniffing', false)).toContain('<g transform="translate(0 11)"><g class="head">')
+  expect(frontView('peering', false)).not.toBe(frontView('awake', false))
+  // Closed eyes show no iris.
+  expect(frontView('waiting', false)).not.toContain('url(#iris)')
+  expect(frontView('awake', false)).toContain('url(#iris)')
+  expect(frontView('pouncing', false)).toBe(frontView('pouncing', true))
+```
 
-test('a walking chase runs right, turns and comes back', () => {
-  const chase = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'chasing' })
-  expect(chase).toContain('.side-r{animation:shown 0.6s linear 0s}')
-  expect(chase).toContain('.side-l{animation:shown 0.6s linear 0.6s}')
-  expect(chase).toContain('.front{animation:hidden 0.6s linear 0s,hidden 0.6s linear 0.6s}')
-  const after = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'chasing', from: 'left' })
-  expect(after).toContain('.side-r{animation:shown 1.2s linear 0s,shown 0.6s linear 1.2s}')
-  expect(after).toContain('.side-l{animation:shown 0.6s linear 1.8s}')
-})
+replacing the four `expect(frontView(...))` lines at the end of that test. Then add:
 
-test('only a walk that moves or chases draws the side view', () => {
-  const moving = { ...BASE, activity: 'peering', from: 'middle', to: 'right' } as const
-  expect(stageFor({ ...moving, gait: 'slide', motion: 'always' })).not.toContain('class="side-')
-  expect(stageFor({ ...moving, gait: 'walk', motion: 'never' })).not.toContain('class="side-')
-  expect(stageFor({ ...BASE, gait: 'walk', motion: 'always' })).not.toContain('class="side-')
-  expect(stageFor({ ...moving, gait: 'walk', motion: 'auto' })).toContain('prefers-reduced-motion:reduce')
+```ts
+test('her tail turns about the point where it meets her body', () => {
+  expect(frontView('awake', true)).toContain('<g class="tail">')
+  for (const look of ['proud', 'chasing'] as const) expect(frontView(look, true), look).toContain('<g class="tail tail-up">')
+  expect(frontStyle('awake')).toMatch(/\.tail\{transform-origin:[\d.]+px [\d.]+px\}\.tail-up\{transform-origin:[\d.]+px [\d.]+px\}/)
 })
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+The picture now holds a second gradient. In the URL guards of `the picture is a self-contained ASCII drawing...` (`hooks/stage.test.ts`) and of the matching test in `hooks/cat.test.ts` (line 72), change `url\((?!#coat\))` to `url\((?!#coat\)|#iris\))`.
 
-Run: `claude plugin test .`
-Expected: FAIL: no `side-r` in the markup.
+- [ ] **Step 2: Port the drawing**
 
-- [ ] **Step 3: Draw the side view and swap it in while she walks**
+In `hooks/drawing.ts`, port the mockup's round-3 drawing as typed, pure code:
 
-In `hooks/stage.ts`:
+1. Add `fluff` and `plume` as module functions, typed (`[number, number]` points), with the small helpers the byte-for-byte match also needs (`r1`, `P`, `mirror`, `flipPath` and the bib's two `run` helpers), rounding to one decimal as the mockup does, so the same inputs give the same string. Build every fixed path once, as a module constant (`BODY`, `HEAD`, `BIB`, `TAIL_LOW`, `TAIL_UP`, the ear paths per kind), not per render.
+2. Replace `head`, `ruff`, `face`, `body`, `paws`, `tail`, `EAR_PATHS`, `ears` and `eyeShapes` with the ported shapes, keeping each function's name and signature where one exists (`ears(kind)`, `eyes(kind)`, `tail(isRaised)`).
+3. Rename `AMBER` to `EYE` (`#f0c040`, the mockup's `GOLD`) and use it for the happy and squint strokes. Delete `NOSE` and `EAR` if nothing reads them after the port. `CLOSED` stays: the mockup draws closed eyes in the same `#8a6f60`.
+4. In `ORIGINS`, replace `.tail{transform-origin:78px 82px}` with `.tail{transform-origin:86px 89px}` and add `.tail-up{transform-origin:74px 86px}` right after it. The low plume starts at `60 88` under her body, but turning it about that point swings its tip below the floor (flick +16 deg reaches about `y 103`); `86 89` is where it leaves her body, and keeps a flick inside the grid. The raised plume turns about its first point (`74 86`). Step 4 checks both.
+5. Rewrite `frontView` to the order `look3` draws: tail, body, paws, then the head group (or, sniffing, the bib and then the lowered head), then `mark(look, isAnimated)`.
+6. Update the comments that still say "stage" (`frontStyle`, `frontView` in `drawing.ts`, and `// The stage is drawn as an image...` in the `every look moves in its own way` test) to say "picture".
 
-1. Change the drawing import to:
-
-```ts
-import { AMBER, COAT, DEFS, EAR, frontStyle, frontView, NOSE, PUPIL, REDUCED, RIM, tailStrokes, WHITE } from './drawing'
-```
-
-2. Add after `view`:
-
-```ts
-// Mango from the side, facing right, on the front view's 120 x 96 grid: long black coat
-// with the same rim and gradient, white ruff, four legs with white paws, an amber eye and
-// a raised tail. The legs trot in diagonal pairs: leg-a is the near hind and far fore,
-// leg-b the far hind and near fore. The far legs sit behind the body, a shade darker.
-const leg = (pair: 'a' | 'b', x: number, isFar: boolean): string =>
-  `<g class="leg-${pair}"${isFar ? ' opacity="0.75"' : ''}><path d="M ${x - 3.5} 64 L ${x - 3.5} 84 Q ${x} 88 ${x + 3.5} 84 L ${x + 3.5} 64 Z" fill="${COAT}" stroke="${RIM}" stroke-width="1.2"/><ellipse cx="${x}" cy="86" rx="5" ry="3" fill="${WHITE}"/></g>`
-
-const SIDE =
-  `<g class="side-tail">${tailStrokes('M 34 60 C 16 58 10 40 16 26 C 19 20 25 21 25 27')}</g>` +
-  leg('b', 36, true) +
-  leg('a', 76, true) +
-  `<g class="side-trunk">` +
-  `<ellipse cx="58" cy="62" rx="30" ry="14" fill="url(#coat)" stroke="${RIM}" stroke-width="1.2"/>` +
-  `<path d="M 78 52 L 90 60 L 84 62 L 90 70 L 80 68 L 76 60 Z" fill="${WHITE}"/>` +
-  `<path d="M 80 34 L 82 16 L 92 28 Z" fill="${COAT}" stroke="${RIM}" stroke-width="1.2" stroke-linejoin="round"/>` +
-  `<circle cx="90" cy="44" r="15" fill="url(#coat)" stroke="${RIM}" stroke-width="1.2"/>` +
-  `<path d="M 88 32 L 94 14 L 100 32 Z" fill="${COAT}" stroke="${RIM}" stroke-width="1.2" stroke-linejoin="round"/><path d="M 91 29 L 94 19 L 97 29 Z" fill="${EAR}"/>` +
-  `<ellipse cx="97" cy="42" rx="3.4" ry="3" fill="${AMBER}"/><ellipse cx="97.6" cy="42" rx="1" ry="2.6" fill="${PUPIL}"/>` +
-  `<path d="M 104 47 L 106 49.5 L 103 50 Z" fill="${NOSE}"/>` +
-  `<g stroke="${WHITE}" stroke-width="0.9" stroke-linecap="round" opacity="0.8"><path d="M 100 49 L 116 46"/><path d="M 100 51 L 115 53"/></g>` +
-  `</g>` +
-  leg('b', 82, false) +
-  leg('a', 42, false)
-
-// One trot cycle is two steps.
-const STEP = 0.5
-const SIDE_STYLE = [
-  '@keyframes shown{from,to{opacity:1}}',
-  '@keyframes hidden{from,to{opacity:0}}',
-  '@keyframes trot{0%,100%{transform:rotate(14deg)}50%{transform:rotate(-14deg)}}',
-  '@keyframes step-bob{0%,50%,100%{transform:translateY(0)}25%,75%{transform:translateY(-1.2px)}}',
-  '.leg-a,.leg-b{transform-box:fill-box;transform-origin:50% 0}',
-  '.side-tail{transform-origin:34px 60px}',
-  `.leg-a{animation:trot ${sec(STEP)} linear infinite}.leg-b{animation:trot ${sec(STEP)} linear ${sec(-STEP / 2)} infinite}`,
-  `.side-trunk{animation:step-bob ${sec(STEP)} ease-in-out infinite}.side-tail{animation:sway 1s ease-in-out infinite}`,
-].join('')
-
-// The side view, both ways. Each is hidden by its own attribute, so a picture without
-// its style sheet (or with motion reduced) never shows it, as with the heart.
-const SIDES = `<g class="side-r" opacity="0">${view(SIDE)}</g><g class="side-l" opacity="0"><g transform="translate(120 0) scale(-1 1)">${view(SIDE)}</g></g>`
-
-const hasSide = (s: StageInput): boolean => s.motion !== 'never' && s.gait === 'walk' && (s.from !== s.to || s.activity === 'chasing')
-```
-
-3. In `stageStyle`, replace `travel` and the move block with:
-
-```ts
-  // How she travels for `seconds` from `delay` on, facing `dir`. Walking swaps the front
-  // view for the side view that way; sliding carries the front view with a bob and paws.
-  const travel = (dir: 'r' | 'l', delay: number, seconds: number) => {
-    if (s.gait === 'walk') {
-      add(`.side-${dir}`, `shown ${sec(seconds)} linear ${sec(delay)}`)
-      add('.front', `hidden ${sec(seconds)} linear ${sec(delay)}`)
-      return
-    }
-    const steps = Math.round(seconds / BOB)
-    add('.front', `slide-bob ${sec(BOB)} ease-in-out ${sec(delay)} ${steps}`)
-    add('.paw-l', `knead ${sec(BOB)} ease-in-out ${sec(delay)} ${steps}`)
-    add('.paw-r', `knead ${sec(BOB)} ease-in-out ${sec(delay + BOB / 2)} ${steps}`)
-  }
-
-  let start = 0
-  if (s.from !== s.to) {
-    rules.push(`@keyframes move{from{transform:translateX(${SPOT_X[s.from]}px)}to{transform:translateX(${SPOT_X[s.to]}px)}}`)
-    add('.spot', `move ${sec(MOVE)} linear both`)
-    travel(SPOT_X[s.to] > SPOT_X[s.from] ? 'r' : 'l', 0, MOVE)
-    start = MOVE
-  }
-```
-
-and in the chasing block replace `travel(start, DASH)` with:
-
-```ts
-    travel('r', start, DASH / 2)
-    travel('l', start + DASH / 2, DASH / 2)
-```
-
-and change `const rules = [STAGE_KEYFRAMES]` to:
-
-```ts
-  const rules = [STAGE_KEYFRAMES, hasSide(s) ? SIDE_STYLE : '']
-```
-
-4. In `stageFor`, change the front line to:
-
-```ts
-    `<g class="front">${view(frontView(look, isAnimated))}</g>` +
-    (hasSide(s) ? SIDES : '') +
-```
-
-- [ ] **Step 4: Run the tests and the type check**
+- [ ] **Step 3: Run the tests and the type check**
 
 Run: `claude plugin test .` then `npx -p typescript tsc -p . --noEmit`
-Expected: all pass; tsc prints nothing.
+Expected: all pass (77 plus 1 new, 78; read it off the output); tsc prints nothing.
 
-- [ ] **Step 5: Let Node load the plugin's suffix-less imports**
+- [ ] **Step 4: Check the port against the mockup, pixel by pixel**
 
-`stage.ts` imports `./drawing` without a suffix, which Node cannot resolve on its own. Create `/tmp/mango-render/ts-ext.mjs`:
+Write `/tmp/mango-render/design/build-check.mjs`. It imports `frontView` and `DEFS` from `hooks/drawing.ts` (with `--import ../ts-ext.mjs`, as `stage-check.mjs` did) and `look3`, `COATS` and `LOOKS` from the mockup (add those exports to `mock.mjs`; the mockup is throwaway). `look3` takes a row of `LOOKS`, not a name. For each of the 12 looks it renders the still front view and `look3(COATS.black, LOOKS.find(l => l[0] === look))` at 4x in headless Brave over CDP, and prints the number of differing pixels, then `ALL MATCH` or the looks that differ. It also prints each look's bounding box in grid units, still and moving, and flags anything outside `0..120 x 0..96`. Moving means `pictureFor` under `always` at 0, 25, 55 and 80 % of a pounce and of the chase, plus every look's tail at its rotation extremes: sway -4 and +7 deg, flick +16 and -8, tap +8, lash -10 and +16, shiver +-1.5.
 
-```js
-// Lets Node load the plugin's TypeScript files, which import each other without a suffix.
-import { registerHooks } from 'node:module'
+Run: `cd /tmp/mango-render/design && node --import ../ts-ext.mjs build-check.mjs`
+Expected: `ALL MATCH` (the class wrappers draw nothing) and no box outside the grid. Two overflows are expected on the first run, so fix them and rerun: the pounce's 55 % frame (`translateY(-6px) scaleY(1.04)` lifts the ear tips to about `y -4.8`; change that frame to `translateY(-4px) scaleY(1)` in `ACT_KEYFRAMES` in `hooks/stage.ts`), and the raised tail under the lash's +16 deg (about `x 120.6`; lower the lash to +12 deg). If a tail still leaves the grid, move its origin along the plume toward the body and rerun.
 
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    if (/^\.\.?\//.test(specifier) && !/\.[a-z]+$/.test(specifier)) {
-      try {
-        return nextResolve(`${specifier}.ts`, context)
-      } catch {
-        // not a .ts file: resolve it as written
-      }
-    }
-    return nextResolve(specifier, context)
-  },
-})
-```
+- [ ] **Step 5: Show Malin**
 
-- [ ] **Step 6: Check the stage in a real browser**
+Run `node poses.mjs` in `/tmp/mango-render` (it builds `poses.html` and `motion.html` from `drawingFor`; add a `pictures.html` that shows all 12 looks through `pictureFor` under `always`, with a pounce and a chase that replay every 3 s). Serve it with the `mango-render` launch config and open it in the browser pane beside `design/faces.html`. Never ask her to turn on Windows animation effects: the harness strips the reduced-motion query. Ask her two things: does every look match the faces she approved, and does the moving picture (breathing, blinks, the tail sway from its new origin, the pounce, the chase) look right. Fold in her notes and repeat this step until she says yes.
 
-Create `/tmp/mango-render/stage-check.mjs`:
+- [ ] **Step 6: Rebuild the README art**
 
-```js
-// Checks Mango's stage in headless Brave: the front view's parts turn about the same
-// points as on the single drawing, the side view shows only while she travels, and at
-// every moment exactly one view of her is visible. Saves walk frames to look at.
-// Run: cd /tmp/mango-render && node --import ./ts-ext.mjs stage-check.mjs
-import { spawn } from 'node:child_process'
-import { pathToFileURL } from 'node:url'
-import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { drawingFor } from 'file:///C:/Users/Nugget/Documents/Development/GitHub/repos/mango-buddy/hooks/drawing.ts'
-import { stageFor } from 'file:///C:/Users/Nugget/Documents/Development/GitHub/repos/mango-buddy/hooks/stage.ts'
+Run: `cd /tmp/mango-render && node readme-art.mjs`, then `node readme.mjs` and look at the result: `assets/bands.svg` and the mood-card drawings now show the portrait. Check in the pane that the band picture and the mood cards line up as before (`shot.mjs` prints the boxes).
 
-const dir = mkdtempSync(join(tmpdir(), 'stage-'))
-const page = (name, svg) => {
-  const file = join(dir, `${name}.svg`)
-  writeFileSync(file, svg)
-  return pathToFileURL(file).href
-}
-// motion: always, so the check never depends on the system's reduced-motion setting.
-const base = { pose: 'awake', activity: null, from: 'right', to: 'right', motion: 'always', gait: 'walk' }
-const urls = {
-  single: page('single', drawingFor('awake', true).replace('prefers-reduced-motion:reduce', 'min-width:99999px')),
-  rest: page('rest', stageFor(base)),
-  walk: page('walk', stageFor({ ...base, activity: 'peering', from: 'left' })),
-  chase: page('chase', stageFor({ ...base, activity: 'chasing', from: 'middle', to: 'middle' })),
-}
-
-const browser = spawn('C:/Program Files/BraveSoftware/Brave-Origin/Application/brave.exe', ['--headless', '--disable-gpu', '--no-first-run', `--user-data-dir=${mkdtempSync(join(tmpdir(), 'bv-'))}`, '--remote-debugging-port=0', 'about:blank'])
-const ws = await new Promise(r => browser.stderr.on('data', d => { const m = /ws:\/\/\S+/.exec(String(d)); if (m) r(m[0]) }))
-const sock = new WebSocket(ws)
-await new Promise(r => { sock.onopen = r })
-let id = 0
-const pending = {}
-sock.onmessage = m => { const j = JSON.parse(m.data); if (j.id && pending[j.id]) { pending[j.id](j.result); delete pending[j.id] } }
-const send = (method, params = {}, sessionId) => new Promise(r => { const i = ++id; pending[i] = r; sock.send(JSON.stringify({ id: i, method, params, sessionId })) })
-const { targetId } = await send('Target.createTarget', { url: 'about:blank' })
-const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true })
-await send('Emulation.setDeviceMetricsOverride', { width: 400, height: 120, deviceScaleFactor: 2, mobile: false }, sessionId)
-await send('Page.enable', {}, sessionId)
-
-const open = async url => { await send('Page.navigate', { url }, sessionId); await new Promise(r => setTimeout(r, 800)) }
-// Pauses every animation at `ms` and reads where things are and what shows.
-const at = async ms => (await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
-  document.getAnimations().forEach(a => { a.pause(); a.currentTime = ${ms} })
-  const box = s => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return [b.x, b.y, b.width, b.height].map(n => Math.round(n)) }
-  const shown = s => { const e = document.querySelector(s); return e ? Number(getComputedStyle(e).opacity) : 0 }
-  return { tail: box('.tail'), ear: box('.ear-l'), front: shown('.front'), r: shown('.side-r'), l: shown('.side-l'), spot: box('.front') }
-})()` }, sessionId)).result.value
-
-let failed = 0
-const check = (label, ok, detail) => { if (!ok) failed += 1; console.log(ok ? 'PASS' : 'FAIL', label, ok ? '' : JSON.stringify(detail)) }
-const near = (a, b) => a !== null && b !== null && a.every((n, i) => Math.abs(n - (b[i] ?? 0)) <= 1)
-
-// 1. Origins: at the right spot (x 240) the tail and ear sit and turn as on the single drawing.
-for (const ms of [0, 700, 1900, 3100]) {
-  await open(urls.single); const one = await at(ms)
-  await open(urls.rest); const staged = await at(ms)
-  const shift = b => b && [b[0] - 240, ...b.slice(1)]
-  check(`tail at ${ms} ms`, near(shift(staged.tail), one.tail), { staged: staged.tail, single: one.tail })
-  check(`ear at ${ms} ms`, near(shift(staged.ear), one.ear), { staged: staged.ear, single: one.ear })
-}
-
-// 2. A walk to the right: the side view while she moves, the front once she is there.
-await open(urls.walk)
-for (const ms of [0, 600, 1199]) { const s = await at(ms); check(`walk at ${ms} ms shows the side view`, s.r === 1 && s.l === 0 && s.front === 0, s) }
-const arrived = await at(1250)
-// The front view's left edge is her coat, about 20 units into her 120-wide spot.
-check('walk ends on the front view at the right spot', arrived.front === 1 && arrived.r === 0 && arrived.spot !== null && arrived.spot[0] >= 240 && arrived.spot[0] < 300, arrived)
-
-// 3. A chase: out facing right, back facing left, never two views or none.
-await open(urls.chase)
-for (const ms of [0, 300, 599, 600, 601, 900, 1199, 1200, 1201, 1300]) {
-  const s = await at(ms)
-  check(`chase at ${ms} ms shows one view`, s.front + s.r + s.l === 1, s)
-}
-
-// 4. Frames of the walk to look at, every 150 ms.
-await open(urls.walk)
-for (const ms of [0, 150, 300, 450, 600, 750, 900, 1050, 1300]) {
-  await at(ms)
-  const { data } = await send('Page.captureScreenshot', { format: 'png' }, sessionId)
-  writeFileSync(new URL(`./walk-${ms}.png`, import.meta.url), Buffer.from(data, 'base64'))
-}
-
-console.log(failed === 0 ? 'ALL PASS' : `${failed} FAILED`, '| frames: walk-*.png')
-browser.kill()
-process.exit(failed === 0 ? 0 : 1)
-```
-
-Run: `cd /tmp/mango-render && node --import ./ts-ext.mjs stage-check.mjs`
-Expected: `ALL PASS`. If a tail or ear check fails, the nested viewport is not acting as the transform reference: fix the markup in `stage.ts` (not the check) and rerun. If the chase check shows two views at a boundary, adjust the timings so one ends where the next begins.
-
-- [ ] **Step 7: Look at the walk, then show Malin**
-
-Open the `walk-*.png` frames (the image hook needs an `allow-read:` per PNG path). Check: four legs that trot in diagonal pairs, white paws, the body bobs, the tail sways, she faces right, nothing is clipped at the stage edge, and the side view's size and colours match the front view. Fix what is off in `SIDE` (two rounds at most), rerun Step 6, then show Malin the frames and ask whether the walk looks like Mango. Change only what she asks for. Never ask her to turn on animation effects to see it.
-
-- [ ] **Step 8: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add hooks/stage.ts hooks/stage.test.ts
-git commit -m "Let Mango walk between spots in a side view of her own"
+git add hooks/drawing.ts hooks/stage.ts hooks/stage.test.ts hooks/cat.test.ts assets README.md
+git commit -m "Draw Mango from photos of the real her"
 ```
+
+Add `README.md` only if `readme-art.mjs` changed it. Never add anything from `/tmp/mango-render/portrait/`: the photos stay on this machine.
 
 ---
 
-### Task 8: Motion and gait settings, and the stage in the band
+### Task 10: Motion settings, and the picture in the band
 
 **Files:**
 - Modify: `types/index.d.ts` (drop `isStill`)
@@ -1522,8 +1348,8 @@ git commit -m "Let Mango walk between spots in a side view of her own"
 - Test: `hooks/mango.test.ts`
 
 **Interfaces:**
-- Consumes: `REST`, `showing` from `hooks/activity.ts`; `stageFor`, `STAGE_WIDTH`, `STAGE_HEIGHT` from `hooks/stage.ts`; `altFor` from `hooks/drawing.ts`; `Look` via `frameFor`/`faceFor`/`toneFor` from `hooks/cat.ts`.
-- Produces: atoms `stage` (default `REST`), `motion` (default `'auto'`), `gait` (default `'walk'`) in `register.tsx`; the `isStill` atom is gone. `/mango still | move | auto | walk | slide`. The desktop draws `stageFor(...)` at 180 x 48 (90 x 24 short), always as an image (`isInteractive: false`), with no hover; the terminal draws `frameFor(look)` where `look` follows `showing(...)`.
+- Consumes: `showing` from `hooks/activity.ts`; `pictureFor` from `hooks/stage.ts`; `altFor`, `DRAWING_WIDTH`, `DRAWING_HEIGHT` from `hooks/drawing.ts`; `Look` via `frameFor`/`faceFor`/`toneFor` from `hooks/cat.ts`.
+- Produces: atoms `activity` (default `null`) and `motion` (default `'auto'`) in `register.tsx`; the `isStill` atom is gone. `/mango still | move | auto`. The desktop draws `pictureFor(...)` at 60 x 48 (30 x 24 short), always as an image (`isInteractive: false`), with no hover; the terminal draws `frameFor(look)` where `look` follows `showing(...)`.
 
 Behaviour change from v1, by the spec's priority: a timed mood (ruffled, proud) now beats working, so a failed command shows ruffled during the turn instead of after it.
 
@@ -1531,15 +1357,14 @@ Behaviour change from v1, by the spec's priority: a timed mood (ruffled, proud) 
 
 In `hooks/mango.test.ts`:
 
-1. In `the desktop draws a picture of Mango and a line, no ASCII rows`, change `expect(cat?.props.width).toBe(60)` to:
+1. In `the desktop draws a picture of Mango and a line, no ASCII rows`, add after `expect(cat?.props.width).toBe(60)`:
 
 ```ts
-  expect(cat?.props.width).toBe(180)
   expect(cat?.props.height).toBe(48)
-  expect(String(cat?.props.source)).toContain('<g class="spot" transform="translate(120 0)">')
+  expect(String(cat?.props.source)).toContain('<g class="act">')
 ```
 
-2. In `a short desktop band draws the picture at half size`, change the two expectations to `toBe(90)` and `toBe(24)`.
+2. `a short desktop band draws the picture at half size` already expects 30 x 24, the picture's half size. Leave it.
 
 2b. In `the desktop picture keeps its markup across ticks and changes with the mood`, change `expect(before?.props.isInteractive).toBe(true)` to `toBe(false)` and the comment below it to `// A changed source would restart her animations.` Then add:
 
@@ -1553,7 +1378,7 @@ test('the desktop draws Mango as one image, with no hover', async ($, on) => {
   const svgs = await ui.findAll({ type: 'Svg' })
   expect(svgs).toHaveLength(1)
   expect(svgs[0]?.props.isInteractive).toBe(false)
-  expect(svgs[0]?.props.width).toBe(180)
+  expect(svgs[0]?.props.width).toBe(60)
   expect(svgs[0]?.props.height).toBe(48)
   expect(String(svgs[0]?.props.source)).not.toContain('class="heart"')
   // A hover Box drawn absolute shows as a popover card above the band (hover probe, 2026-10-16).
@@ -1587,17 +1412,6 @@ test('/mango still, move and auto store how she moves and redraw her', async ($,
   expect(String((await cat())?.source)).toContain('prefers-reduced-motion:reduce')
 })
 
-test('/mango walk and slide store her gait', async ($, on) => {
-  mock.clock(on)
-  const data = memoryStore(on)
-  answerStart(on)
-  await $.session.start(START)
-  expect((await run($, 'slide')).text).toBe('Mango slides.')
-  expect(data.get('gait')).toBe('slide')
-  expect((await run($, 'walk')).text).toBe('Mango walks.')
-  expect(data.get('gait')).toBe('walk')
-})
-
 test('an old isStill: true loads as never and is written as motion once', async ($, on) => {
   mock.clock(on)
   const data = memoryStore(on, { isStill: true })
@@ -1621,9 +1435,9 @@ test('a stored motion wins over an old isStill', async ($, on) => {
   expect(kept.get('motion')).toBe('always')
 })
 
-test('junk stored settings fall back to auto and walk, and a non-true isStill never migrates', async ($, on) => {
+test('junk stored settings fall back to auto, and a non-true isStill never migrates', async ($, on) => {
   mock.clock(on)
-  const data = memoryStore(on, { motion: 'fast', gait: 7, isStill: 'yes' })
+  const data = memoryStore(on, { motion: 'fast', isStill: 'yes' })
   answerStart(on)
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
@@ -1652,19 +1466,19 @@ test('a timed mood beats working on every surface', async ($, on) => {
 4. In `/mango card reports stats; unknown words get help`, add after the `dance` line:
 
 ```ts
-  expect((await run($, 'dance')).text).toBe('Mango knows: pet, mute, unmute, still, move, auto, walk, slide, off, on, card.')
+  expect((await run($, 'dance')).text).toBe('Mango knows: pet, mute, unmute, still, move, auto, off, on, card.')
 ```
 
 - [ ] **Step 2: Run the tests to see them fail**
 
 Run: `claude plugin test .`
-Expected: FAIL on the width, the new command words, the migration and the timed-mood test.
+Expected: FAIL on the picture's markup, the new command words, the migration and the timed-mood test.
 
 - [ ] **Step 3: Drop isStill from the contract**
 
 In `types/index.d.ts`, delete the line `      isStill: boolean`.
 
-- [ ] **Step 4: Add the settings and draw the stage**
+- [ ] **Step 4: Add the settings and draw the picture**
 
 In `hooks/register.tsx`:
 
@@ -1673,45 +1487,38 @@ In `hooks/register.tsx`:
 ```ts
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
-import type { Gait, Mood, Motion } from '../types'
-import { REST, showing } from './activity'
+import type { Activity, Mood, Motion } from '../types'
+import { showing } from './activity'
 import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS, toneFor } from './cat'
-import { altFor } from './drawing'
-import { STAGE_HEIGHT, STAGE_WIDTH, stageFor } from './stage'
+import { altFor, DRAWING_HEIGHT, DRAWING_WIDTH } from './drawing'
+import { pictureFor } from './stage'
 ```
 
 2. Replace `export const isStill = ...` with:
 
 ```ts
-// How she moves and walks, stored. Read once in session.start, written on change.
+// How she moves, stored. Read once in session.start, written on change.
 export const motion = atom({ plugin: 'mango', key: 'motion' } as const, 'auto' as Motion)
-export const gait = atom({ plugin: 'mango', key: 'gait' } as const, 'walk' as Gait)
-// What the desktop picture shows: activity, from and to in one atom, so a change is one
-// write and one redraw.
-export const stage = atom({ plugin: 'mango', key: 'stage' } as const, REST)
+// What the desktop picture shows over her mood. Written at most once per clock period,
+// so a burst of tool calls is one write and one redraw.
+export const activity = atom({ plugin: 'mango', key: 'activity' } as const, null as Activity | null)
 ```
 
 3. Add after `const flag = ...`:
 
 ```ts
 const motionOf = (x: unknown): Motion | undefined => (x === 'auto' || x === 'always' || x === 'never' ? x : undefined)
-const gaitOf = (x: unknown): Gait | undefined => (x === 'walk' || x === 'slide' ? x : undefined)
 ```
 
-4. Replace `HELP` and add the two setters below it:
+4. Replace `HELP` and add the setter below it:
 
 ```ts
-const HELP = 'Mango knows: pet, mute, unmute, still, move, auto, walk, slide, off, on, card.'
+const HELP = 'Mango knows: pet, mute, unmute, still, move, auto, off, on, card.'
 
 // Stores how she moves and redraws her with it.
 const setMotion = async ($: EngineType, value: Motion): Promise<void> => {
   await $.store.set('motion', value)
   await update($, motion, () => value)
-}
-
-const setGait = async ($: EngineType, value: Gait): Promise<void> => {
-  await $.store.set('gait', value)
-  await update($, gait, () => value)
 }
 ```
 
@@ -1727,17 +1534,11 @@ const setGait = async ($: EngineType, value: Gait): Promise<void> => {
     case 'auto':
       await setMotion($, 'auto')
       return 'Mango follows your system.'
-    case 'walk':
-      await setGait($, 'walk')
-      return 'Mango walks.'
-    case 'slide':
-      await setGait($, 'slide')
-      return 'Mango slides.'
 ```
 
 6. In `advanceClock`, change `if (await read($, isStill)) {` to `if ((await read($, motion)) === 'never') {`.
 
-7. In `session.start`, change the `argumentHint` to `'pet | mute | unmute | still | move | auto | walk | slide | off | on | card'`, and replace the three stored-flag lines and their three updates with:
+7. In `session.start`, change the `argumentHint` to `'pet | mute | unmute | still | move | auto | off | on | card'`, and replace the three stored-flag lines and their three updates with:
 
 ```ts
     const storedOff = flag(await $.store.get('isOff'))
@@ -1748,19 +1549,17 @@ const setGait = async ($: EngineType, value: Gait): Promise<void> => {
       storedMotion = 'never'
       await $.store.set('motion', storedMotion)
     }
-    const storedGait = gaitOf(await $.store.get('gait'))
     const moves = storedMotion ?? 'auto'
     await update($, isOff, () => storedOff)
     await update($, isMuted, () => storedMuted)
     await update($, motion, () => moves)
-    await update($, gait, () => storedGait ?? 'walk')
 ```
 
 8. Replace the body of the `ui.render` hook, from `const shown = ...` to the end of the hook, with:
 
 ```tsx
     const shown = isTerminal ? resolveMood(await snapshot($, t)) : await read($, shownMood)
-    const st = await read($, stage)
+    const drawnActivity = await read($, activity)
     const moves = await read($, motion)
     const still = moves === 'never'
     // Still, the tick can sit on a blink frame (0 % 8), which would draw an awake cat with
@@ -1769,7 +1568,7 @@ const setGait = async ($: EngineType, value: Gait): Promise<void> => {
     const said = await read($, remark)
     const muted = await read($, isMuted)
     // Priority, highest first: a timed mood, an activity, working, the resting mood.
-    const now = showing(shown, st.activity, e.props.isWorking)
+    const now = showing(shown, drawnActivity, e.props.isWorking)
     const look = now.activity ?? now.pose
     const isShort = e.props.maxRows < 3
     // The face is 5 columns wide, the two-row art ART_WIDTH. A band narrower than
@@ -1786,17 +1585,17 @@ const setGait = async ($: EngineType, value: Gait): Promise<void> => {
       </>
     )
     if (!isTerminal) {
-      // Surfaces that draw an Svg get the stage; a short band gets it at half size. The
-      // markup follows the stage, pose, motion and gait, never the tick, so her animations
+      // Surfaces that draw an Svg get the picture; a short band gets it at half size. The
+      // markup follows the activity, pose and motion, never the tick, so her animations
       // run on between periods. Always an image: a frame reloads, and blinks, on every new
       // source. An image gets no :hover, so she has no hover heart for now.
       const { Svg } = $.ui.resolve(e)
       const scale = isShort ? 0.5 : 1
-      const source = stageFor({ pose: now.pose, activity: now.activity, from: st.from, to: st.to, motion: moves, gait: await read($, gait) })
+      const source = pictureFor({ pose: now.pose, activity: now.activity, motion: moves })
       return (
         <Box alignItems="center">
           <Box key="cat">
-            <Svg source={source} alt={altFor(now.pose, now.activity)} width={STAGE_WIDTH * scale} height={STAGE_HEIGHT * scale} isInteractive={false} />
+            <Svg source={source} alt={altFor(now.pose, now.activity)} width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} isInteractive={false} />
           </Box>
           {speech}
         </Box>
@@ -1834,20 +1633,20 @@ Expected: all pass, including every v1 test that stores `isStill: true` (they no
 
 ```bash
 git add types/index.d.ts hooks/register.tsx hooks/mango.test.ts
-git commit -m "Draw Mango's stage in the band, with motion and gait settings"
+git commit -m "Draw Mango's activities in the band, with motion settings"
 ```
 
 ---
 
-### Task 9: Activities from tool calls
+### Task 11: Activities from tool calls
 
 **Files:**
 - Modify: `hooks/register.tsx`
 - Test: `hooks/mango.test.ts`
 
 **Interfaces:**
-- Consumes: `ACTIVITY_TICKS`, `activityFor`, `gitStepOf`, `nextStage`, `restStage`, `sameStage` from `hooks/activity.ts`.
-- Produces: module state `shownStage`, `pendingStage`, `activityUntil`, `runningWaits`; helpers `setActivity(a)`, `quietly(work)`, `whileWaiting($, run)`, `writeStage($)`; one hook for Read/Grep/Glob/Edit/Write/WebFetch/WebSearch, one for Agent, and a rewritten Bash hook. Task 10 adds lines to these same hooks.
+- Consumes: `ACTIVITY_TICKS`, `activityFor`, `gitStepOf` from `hooks/activity.ts`; the `activity` atom from Task 10.
+- Produces: module state `shownActivity`, `pendingActivity`, `activityUntil`, `runningWaits`; helpers `setActivity(a)`, `quietly(work)`, `whileWaiting($, run)`, `writeActivity($)`; one hook for Read/Grep/Glob/Edit/Write/WebFetch/WebSearch, one for Agent, and a rewritten Bash hook. Task 12 adds lines to these same hooks.
 
 The spec asks for one hook per tool group. This plan uses one hook for the seven looking tools, driven by `activityFor`, so the tool table lives in one place. The behaviour is the same.
 
@@ -1883,7 +1682,7 @@ const WAITING = 'Mango, a black cat, sits and waits.'
 
 const desktop = ($: Parameters<TestBody>[0], props = BAND) => $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props })
 
-test('a Read walks her left to sniff, and she stays there when it ends', async ($, on) => {
+test('a Read sets her sniffing, and her mood shows again when it ends', async ($, on) => {
   const clock = mock.clock(on)
   memoryStore(on)
   answerStart(on)
@@ -1892,31 +1691,27 @@ test('a Read walks her left to sniff, and she stays there when it ends', async (
   const ui = await desktop($)
   await $.tool.call({ tool: 'Read', file_path: '/home/a/x.ts', tool_use_id: 'a1' })
   await clock.advance(TICK_MS)
-  let cat = await ui.find({ type: 'Svg' })
-  expect(cat?.props.alt).toBe(SNIFFING)
-  expect(String(cat?.props.source)).toContain('<g class="spot" transform="translate(0 0)">')
-  expect(String(cat?.props.source)).toContain('@keyframes move')
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(SNIFFING)
   await clock.advance(TICK_MS * (ACTIVITY_TICKS - 2))
   expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(SNIFFING)
   await clock.advance(TICK_MS)
-  cat = await ui.find({ type: 'Svg' })
+  const cat = await ui.find({ type: 'Svg' })
   expect(cat?.props.alt).toBe(AWAKE)
-  expect(String(cat?.props.source)).toContain('<g class="spot" transform="translate(0 0)">')
-  expect(String(cat?.props.source)).not.toContain('@keyframes move')
+  expect(String(cat?.props.source)).toContain('<g class="act">')
 })
 
-// Counts writes of the stage atom, the guard against extra redraws (each one blinks).
-const countStageWrites = (on: On) => {
+// Counts writes of the activity atom, the guard against extra redraws (each one restarts her motion).
+const countActivityWrites = (on: On) => {
   const count = { writes: 0 }
-  on('state.set', (_$, e, next) => { if (e.key === 'stage') count.writes += 1; return next(e) })
+  on('state.set', (_$, e, next) => { if (e.key === 'activity') count.writes += 1; return next(e) })
   return count
 }
 
-test('a burst of five Reads writes the stage once', async ($, on) => {
+test('a burst of five Reads writes the activity once', async ($, on) => {
   const clock = mock.clock(on)
   memoryStore(on)
   answerStart(on)
-  const count = countStageWrites(on)
+  const count = countActivityWrites(on)
   answerTools(on, clock)
   await $.session.start(START)
   await desktop($)
@@ -1925,11 +1720,11 @@ test('a burst of five Reads writes the stage once', async ($, on) => {
   expect(count.writes).toBe(1)
 })
 
-test('a Read and a WebFetch before one period write the stage once, as peering', async ($, on) => {
+test('a Read and a WebFetch before one period write the activity once, as peering', async ($, on) => {
   const clock = mock.clock(on)
   memoryStore(on)
   answerStart(on)
-  const count = countStageWrites(on)
+  const count = countActivityWrites(on)
   answerTools(on, clock)
   await $.session.start(START)
   const ui = await desktop($)
@@ -1937,31 +1732,14 @@ test('a Read and a WebFetch before one period write the stage once, as peering',
   await $.tool.call({ tool: 'WebFetch', url: 'https://example.com/', prompt: 'p', tool_use_id: 'p2' })
   await clock.advance(TICK_MS)
   expect(count.writes).toBe(1)
-  const cat = await ui.find({ type: 'Svg' })
-  expect(cat?.props.alt).toBe('Mango, a black cat, peers out at the web.')
-  expect(String(cat?.props.source)).toContain('<g class="spot" transform="translate(240 0)">')
-  expect(String(cat?.props.source)).toContain('translateX(120px)}to{transform:translateX(240px)')
-})
-
-test('a new activity mid-walk starts from the spot the last one was heading for', async ($, on) => {
-  const clock = mock.clock(on)
-  memoryStore(on)
-  answerStart(on)
-  answerTools(on, clock)
-  await $.session.start(START)
-  const ui = await desktop($)
-  await $.tool.call({ tool: 'Read', file_path: '/r/f.ts', tool_use_id: 'm1' })
-  await clock.advance(TICK_MS)
-  await $.tool.call({ tool: 'WebSearch', query: 'cats', tool_use_id: 'm2' })
-  await clock.advance(TICK_MS)
-  expect(String((await ui.find({ type: 'Svg' }))?.props.source)).toContain('translateX(0px)}to{transform:translateX(240px)')
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, peers out at the web.')
 })
 
 test('TodoWrite and other tools leave her be', async ($, on) => {
   const clock = mock.clock(on)
   memoryStore(on)
   answerStart(on)
-  const count = countStageWrites(on)
+  const count = countActivityWrites(on)
   answerTools(on, clock)
   await $.session.start(START)
   await desktop($)
@@ -2054,7 +1832,7 @@ test('a failed Bash during an activity shows ruffled, not the activity', async (
   expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
 })
 
-test('a git commit that succeeds makes her pounce in the middle; a failed one ruffles her', async ($, on) => {
+test('a git commit that succeeds makes her pounce; a failed one ruffles her', async ($, on) => {
   const clock = mock.clock(on)
   memoryStore(on)
   answerStart(on)
@@ -2067,8 +1845,7 @@ test('a git commit that succeeds makes her pounce in the middle; a failed one ru
   await clock.advance(TICK_MS)
   const cat = await ui.find({ type: 'Svg' })
   expect(cat?.props.alt).toBe('Mango, a black cat, pounces on the commit.')
-  expect(String(cat?.props.source)).toContain('<g class="spot" transform="translate(120 0)">')
-  expect(String(cat?.props.source)).toContain('pounce 0.8s ease-out 1.2s both')
+  expect(String(cat?.props.source)).toContain('.act{animation:pounce 0.8s ease-out both}')
   await $.tool.call({ tool: 'Bash', command: 'git commit -m broken', tool_use_id: 'c3' })
   expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
 })
@@ -2082,24 +1859,9 @@ test('a git push that succeeds sends her chasing', async ($, on) => {
   const ui = await desktop($)
   await $.tool.call({ tool: 'Bash', command: 'git push -u origin feat', tool_use_id: 'c4' })
   await clock.advance(TICK_MS)
-  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, chases the push.')
-})
-
-test('the gait shows on her next walk: walk draws the side view, slide does not', async ($, on) => {
-  const clock = mock.clock(on)
-  memoryStore(on)
-  answerStart(on)
-  answerTools(on, clock)
-  await $.session.start(START)
-  const ui = await desktop($)
-  await run($, 'move')
-  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'g2' })
-  await clock.advance(TICK_MS)
-  expect(String((await ui.find({ type: 'Svg' }))?.props.source)).toContain('class="side-l"')
-  await run($, 'slide')
-  expect(String((await ui.find({ type: 'Svg' }))?.props.source)).not.toContain('class="side-')
-  await run($, 'walk')
-  expect(String((await ui.find({ type: 'Svg' }))?.props.source)).toContain('class="side-l"')
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.alt).toBe('Mango, a black cat, chases the push.')
+  expect(String(cat?.props.source)).toContain('.act{animation:bounce 1.2s ease-in-out both}')
 })
 
 test('the terminal draws an activity in its own rows, and a timed mood beats it', async ($, on) => {
@@ -2149,25 +1911,27 @@ In `hooks/register.tsx`:
 1. Change the activity and type imports to:
 
 ```ts
-import type { Activity, Gait, Mood, Motion, Stage } from '../types'
-import { ACTIVITY_TICKS, activityFor, gitStepOf, nextStage, REST, restStage, sameStage, showing } from './activity'
+import type { Activity, Mood, Motion } from '../types'
+import { ACTIVITY_TICKS, activityFor, gitStepOf, showing } from './activity'
 ```
 
 2. Add after `let lastMood: Mood = 'awake'`:
 
 ```ts
-// The stage the picture shows (the last one written) and the one the next clock period
-// writes. Tool calls set only the pending stage, so a burst of them costs one redraw.
-let shownStage: Stage = REST
-let pendingStage: Stage = REST
+// The activity the picture shows (the last one written) and the one the next clock period
+// writes. Tool calls set only the pending one, so a burst of them costs one redraw.
+let shownActivity: Activity | null = null
+let pendingActivity: Activity | null = null
 
 // The clock tick the activity ends on, unless a Bash or Agent call still runs.
 let activityUntil = 0
 let runningWaits = 0
 
-// Sets what she does next and restarts its timer. The clock writes it.
+// Sets what she does next and restarts its timer. The clock writes it. The same activity
+// writes nothing, so a burst of Reads, or a second commit that returns within one clock
+// period, draws nothing new and never restarts her motion.
 const setActivity = (a: Activity) => {
-  pendingStage = nextStage(shownStage, a)
+  pendingActivity = a
   activityUntil = clockTick + ACTIVITY_TICKS
 }
 
@@ -2180,13 +1944,13 @@ const quietly = async (work: () => Promise<unknown>): Promise<void> => {
   }
 }
 
-// Writes the pending stage once, and only when it differs from the one showing. A failed
-// write is tried again on the next period.
-const writeStage = async ($: EngineType) => {
-  const s = pendingStage
-  if (sameStage(s, shownStage)) return
-  await update($, stage, () => s)
-  shownStage = s
+// Writes the pending activity once, and only when it differs from the one showing. A
+// failed write is tried again on the next period.
+const writeActivity = async ($: EngineType) => {
+  const a = pendingActivity
+  if (a === shownActivity) return
+  await update($, activity, () => a)
+  shownActivity = a
 }
 ```
 
@@ -2223,19 +1987,19 @@ const whileWaiting = async <T,>($: EngineType, run: () => Promise<T>): Promise<T
 and add at the end of `advanceClock`, after `lastMood = now`:
 
 ```ts
-  if (runningWaits === 0 && t >= activityUntil && pendingStage.activity !== null) {
-    pendingStage = restStage(pendingStage)
+  if (runningWaits === 0 && t >= activityUntil && pendingActivity !== null) {
+    pendingActivity = null
   }
-  await writeStage($)
+  await writeActivity($)
 ```
 
 5. In `session.start`, add right after the `await $.command.register({...})` call, so a failed read can never keep the clock or the command from starting:
 
 ```ts
-    // A repeated session.start picks up the stage the picture already shows.
+    // A repeated session.start picks up the activity the picture already shows.
     await quietly(async () => {
-      shownStage = await read($, stage)
-      pendingStage = shownStage
+      shownActivity = await read($, activity)
+      pendingActivity = shownActivity
     })
 ```
 
@@ -2291,14 +2055,14 @@ git commit -m "Let Mango sniff, watch, peer, wait, pounce and chase as Claude wo
 
 ---
 
-### Task 10: Activity lines
+### Task 12: Activity lines
 
 **Files:**
 - Modify: `hooks/register.tsx`
 - Test: `hooks/mango.test.ts`
 
 **Interfaces:**
-- Consumes: `callLine`, `KEEP_WATCH_TICKS`, `LINE_GAP_TICKS`, `lineFor`, `topicOf`, `Topic` from `hooks/activity.ts`; `setActivity`, `quietly`, `whileWaiting` from Task 9.
+- Consumes: `callLine`, `KEEP_WATCH_TICKS`, `LINE_GAP_TICKS`, `lineFor`, `topicOf`, `Topic` from `hooks/activity.ts`; `setActivity`, `quietly`, `whileWaiting` from Task 11.
 - Produces: module state `activityRemark`, `lastLineTick`, `namedThisTurn`; helpers `say($, line)` and `clearActivityRemark($)`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2421,7 +2185,7 @@ In `hooks/register.tsx`:
 1. Change the activity import to:
 
 ```ts
-import { ACTIVITY_TICKS, activityFor, callLine, gitStepOf, KEEP_WATCH_TICKS, LINE_GAP_TICKS, lineFor, nextStage, REST, restStage, sameStage, showing, topicOf } from './activity'
+import { ACTIVITY_TICKS, activityFor, callLine, gitStepOf, KEEP_WATCH_TICKS, LINE_GAP_TICKS, lineFor, showing, topicOf } from './activity'
 import type { Topic } from './activity'
 ```
 
@@ -2436,7 +2200,7 @@ let lastLineTick = -LINE_GAP_TICKS
 const namedThisTurn = new Set<Topic>()
 ```
 
-3. Add after `writeStage`:
+3. Add after `writeActivity`:
 
 ```ts
 // Shows an activity line: one per LINE_GAP_TICKS at most, and only over an empty remark,
@@ -2469,8 +2233,8 @@ const clearActivityRemark = async ($: EngineType) => {
 4. In `advanceClock`, change the expiry block to:
 
 ```ts
-  if (runningWaits === 0 && t >= activityUntil && pendingStage.activity !== null) {
-    pendingStage = restStage(pendingStage)
+  if (runningWaits === 0 && t >= activityUntil && pendingActivity !== null) {
+    pendingActivity = null
     await clearActivityRemark($)
   }
 ```
@@ -2496,7 +2260,7 @@ const clearActivityRemark = async ($: EngineType) => {
     return next(e)
 ```
 
-6. In the Bash hook, add `const started = clockTick` as its first line, and replace the last two statements (`if (step !== null) ...` and `return ran`) and the comment Task 9 put above them with:
+6. In the Bash hook, add `const started = clockTick` as its first line, and replace the last two statements (`if (step !== null) ...` and `return ran`) and the comment Task 11 put above them with:
 
 ```ts
     // A commit or push that went through: she pounces on it, or chases it out.
@@ -2533,7 +2297,7 @@ git commit -m "Let Mango say a short line at notable moments while Claude works"
 
 ---
 
-### Task 11: Docs, version and the final checks
+### Task 13: Docs, version and the final checks
 
 **Files:**
 - Modify: `README.md`
@@ -2557,10 +2321,9 @@ She follows along while Claude works, too. She sniffs at the files it reads, wat
 2. Replace the `/mango still` / `move` row of the commands table with:
 
 ```markdown
-| `/mango still` | She stays on her spot without moving (calmer for screen readers) |
+| `/mango still` | She sits still without moving (calmer for screen readers) |
 | `/mango move` | She always moves, even when your system asks for reduced motion |
 | `/mango auto` | She follows your system's reduced-motion setting (the default) |
-| `/mango walk` / `slide` | She walks between spots on four paws, or slides there (walk is the default) |
 ```
 
 3. In "Gentle by design", replace the whole "She is alive on desktop" bullet, so it no longer promises a hover reaction (the spec drops hover), keeping the bullet's bold lead-in: `She breathes, blinks, twitches an ear and swishes her tail, and each mood moves in its own way. She holds still when your system asks for reduced motion, unless you tell her `/mango move`.` Then add after "She never phones home":
@@ -2580,10 +2343,11 @@ claude plugin validate .
 claude plugin test .
 npx -p typescript tsc -p . --noEmit
 grep -rn $'\xe2\x80\x94' hooks types README.md docs/superpowers/plans/2026-10-16-mango-reactions.md || echo "no em dashes"
-cd /tmp/mango-render && node front-check.mjs compare && node --import ./ts-ext.mjs stage-check.mjs
+cd /tmp/mango-render/design && node --import ../ts-ext.mjs build-check.mjs
+cd /tmp/mango-render && node readme-art.mjs && git -C ~/Documents/Development/GitHub/repos/mango-buddy status --short assets README.md
 ```
 
-Expected: validate reports no errors; every test passes (read the count off the output, do not assume it); tsc prints nothing; `no em dashes`; `IDENTICAL`; `ALL PASS`. The front view of the six moods did not change, so `readme-art.mjs` does not need a rerun: say so in the PR.
+Expected: validate reports no errors; every test passes (read the count off the output, do not assume it); tsc prints nothing; `no em dashes`; `ALL MATCH` with no box outside the grid; and no changes under `assets` or in `README.md`, which shows the README art Task 9 rebuilt is still current. `front-check.mjs` (the old byte baseline) and `stage-check.mjs` (the walk) no longer apply: Task 9 changed the front view on purpose and Task 8 cut the walk.
 
 - [ ] **Step 4: Ask a fresh reviewer**
 
@@ -2604,13 +2368,15 @@ Mango reacts to coding
 ```
 
 ```markdown
-Mango now reacts to Claude's tool calls. She sniffs at reads (walking left), watches edits, peers out at the web (walking right), waits through Bash and Agent runs, pounces on a commit and chases a push. On desktop she moves across a small three-spot stage, walking in a new side view or sliding. In the terminal she gets new faces. She says a short line at notable moments, at most one every 10 seconds.
+Mango now reacts to Claude's tool calls. She sniffs at reads, watches edits, peers out at the web, waits through Bash and Agent runs, pounces on a commit and chases a push. On desktop she does it all in place, with a look and a motion for each. In the terminal she gets new faces. She says a short line at notable moments, at most one every 10 seconds.
 
-- New pure modules: `hooks/activity.ts` (tools to activities, spots, names, lines, git steps) and `hooks/stage.ts` (the stage picture).
-- One `stage` atom, written at most once per clock period, so a burst of tool calls costs one redraw.
-- `/mango still | move | auto` set motion (never, always, follow the system); `/mango walk | slide` set the gait. A stored `isStill: true` migrates to `never`.
+She is also redrawn from photos of the real Mango: a fluffy black coat, a white bib and mittens, golden eyes, tufted ears and a plume of a tail.
+
+- New pure modules: `hooks/activity.ts` (tools to activities, names, lines, git steps) and `hooks/stage.ts` (the desktop picture).
+- One `activity` atom, written at most once per clock period, so a burst of tool calls costs one redraw.
+- `/mango still | move | auto` set motion (never, always, follow the system). A stored `isStill: true` migrates to `never`.
 - Only a file's basename or a web host ever shows. No paths, patterns, queries, commands or output.
-- The six mood drawings are byte-identical, so the README art needs no rebuild.
+- The README art is rebuilt from the new drawing.
 
 Spec: `docs/superpowers/specs/2026-10-16-mango-reactions-design.md`. Plan: `docs/superpowers/plans/2026-10-16-mango-reactions.md`.
 ```
@@ -2619,7 +2385,7 @@ Then bind the PR with the ccd_pr tools and read its CI. Ward's node job skips (t
 
 - [ ] **Step 6: Merge, release and reinstall, each only with Malin's yes**
 
-Ask Malin before each: merging the PR, then the v0.2.0 release on the merge commit (draft notes in the repo's style and show them first). After the merge, reinstall the way Task 1 Step 2 does it, verify the cache with Task 1 Steps 3 and 4 against the merge commit (add `hooks/activity.ts` and `hooks/stage.ts` to that file loop), and ask her to open a NEW session to look. Her system asks for reduced motion, so with the default `auto` she will see Mango still: tell her `/mango move` shows the walk, and `/mango auto` puts it back.
+Ask Malin before each: merging the PR, then the v0.2.0 release on the merge commit (draft notes in the repo's style and show them first). After the merge, reinstall the way Task 1 Step 2 does it, verify the cache with Task 1 Steps 3 and 4 against the merge commit (add `hooks/activity.ts` and `hooks/stage.ts` to that file loop), and ask her to open a NEW session to look. Her system asks for reduced motion, so with the default `auto` she will see Mango still: tell her `/mango move` shows her motion, the pounce and the chase, and `/mango auto` puts it back.
 
 - [ ] **Step 7: Update memory**
 
@@ -2633,5 +2399,6 @@ Add a dated status line to the project `MEMORY.md` (what merged, the release, th
 - **A Read during a running Bash replaces waiting.** She sniffs, and stays sniffing until the Bash ends plus 6 ticks. The last call wins by the spec's coalescing rule; going back to waiting would add a stack of activities for little gain.
 - **First-of-turn flags across turns that no prompt starts.** Only `prompt.submit` resets them, so a turn started by a background notification keeps the old flags. She simply names less, never more.
 - **Durations in clock ticks.** If clock periods lag, keep-watch under-reports. The spec chose ticks so the test kit can drive them.
+- **Keeping Tasks 6 and 7 and hiding the walk behind a setting.** The stage code would stay for nothing the spec still asks for, and the side view would need a portrait pass of its own. Task 8 cuts it instead; the code stays in git history (`40c24a8..56b8954`).
 
 > Stress-tested 2026-10-16 (skill 1b85fca): 2 applied, 1 adapted, 0 decided by me.
