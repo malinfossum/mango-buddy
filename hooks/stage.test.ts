@@ -1,8 +1,8 @@
 import { expect, test } from 'claude-code/testing'
 import { ACTIVITIES } from './activity'
 import { altFor, frontStyle, frontView } from './drawing'
-import { stageFor } from './stage'
-import type { StageInput } from './stage'
+import { pictureFor } from './stage'
+import type { PictureInput } from './stage'
 
 const POSES = ['awake', 'sleeping', 'ruffled', 'proud', 'worried', 'working'] as const
 const LOOKS = [...POSES, ...ACTIVITIES]
@@ -40,91 +40,56 @@ test('the activities show in the still picture too', () => {
   expect(frontView('pouncing', false)).toBe(frontView('pouncing', true))
 })
 
-const BASE: StageInput = { pose: 'awake', activity: null, from: 'middle', to: 'middle', motion: 'auto', gait: 'slide' }
+const BASE: PictureInput = { pose: 'awake', activity: null, motion: 'auto' }
 
-test('the stage is a self-contained ASCII picture, the same for the same inputs', () => {
+test('the picture is a self-contained ASCII drawing, the same for the same inputs', () => {
   for (const motion of ['auto', 'always', 'never'] as const) {
     for (const activity of [null, ...ACTIVITIES]) {
-      const svg = stageFor({ ...BASE, motion, activity, from: 'left', to: 'right' })
-      expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" width="360" height="96">')).toBe(true)
+      const svg = pictureFor({ ...BASE, motion, activity })
+      expect(svg.startsWith('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 96" width="120" height="96">')).toBe(true)
       expect(svg.endsWith('</svg>')).toBe(true)
       expect(svg).not.toMatch(/<script|<image|href=|on[a-z]+=|url\((?!#coat\))/i)
       expect(svg).toMatch(/^[ -~]+$/)
-      expect(svg).toBe(stageFor({ ...BASE, motion, activity, from: 'left', to: 'right' }))
+      expect(svg).toBe(pictureFor({ ...BASE, motion, activity }))
     }
   }
 })
 
-test('she rests on her spot by its own attribute, and walks only when the spot changes', () => {
-  for (const [to, x] of [['left', 0], ['middle', 120], ['right', 240]] as const) {
-    const svg = stageFor({ ...BASE, from: to, to })
-    expect(svg).toContain(`<g class="spot" transform="translate(${x} 0)">`)
-    expect(svg).not.toContain('@keyframes move')
+test('she stays in place: no spots, no walk and no side view', () => {
+  for (const motion of ['auto', 'always', 'never'] as const) {
+    for (const activity of [null, ...ACTIVITIES]) {
+      const svg = pictureFor({ ...BASE, motion, activity })
+      expect(svg, `${motion} ${activity}`).toContain('<g class="act">')
+      expect(svg, `${motion} ${activity}`).not.toMatch(/class="(spot|side-[rl]|leg-[ab])"|@keyframes (move|dash|trot|slide-bob)/)
+    }
   }
-  const moving = stageFor({ ...BASE, activity: 'peering', from: 'left', to: 'right' })
-  expect(moving).toContain('<g class="spot" transform="translate(240 0)">')
-  expect(moving).toContain('@keyframes move{from{transform:translateX(0px)}to{transform:translateX(240px)}}')
-  expect(moving).toContain('.spot{animation:move 1.2s linear both}')
 })
 
 test('motion decides the style sheet and the reduced-motion query', () => {
-  const never = stageFor({ ...BASE, motion: 'never', activity: 'peering', from: 'left', to: 'right' })
-  expect(never).not.toContain('<style>')
-  expect(never).toContain('<g class="spot" transform="translate(240 0)">')
-  expect(stageFor({ ...BASE, motion: 'always' })).toContain('<style>')
-  expect(stageFor({ ...BASE, motion: 'always' })).not.toContain('prefers-reduced-motion')
-  expect(stageFor({ ...BASE, motion: 'auto' })).toContain('prefers-reduced-motion:reduce')
+  expect(pictureFor({ ...BASE, motion: 'never', activity: 'peering' })).not.toContain('<style>')
+  expect(pictureFor({ ...BASE, motion: 'always' })).toContain('<style>')
+  expect(pictureFor({ ...BASE, motion: 'always' })).not.toContain('prefers-reduced-motion')
+  expect(pictureFor({ ...BASE, motion: 'auto' })).toContain('prefers-reduced-motion:reduce')
   for (const motion of ['auto', 'always', 'never'] as const) {
-    expect(stageFor({ ...BASE, motion }), motion).not.toContain('class="heart"')
+    expect(pictureFor({ ...BASE, motion }), motion).not.toContain('class="heart"')
+    expect(pictureFor({ ...BASE, motion }), motion).not.toContain(':hover')
   }
 })
 
-test('a slide carries the front view with a bob and stepping paws', () => {
-  const slide = stageFor({ ...BASE, motion: 'always', activity: 'sniffing', from: 'middle', to: 'left' })
-  expect(slide).toContain('slide-bob 0.3s ease-in-out 0s 4')
-  expect(slide).toContain('.paw-l{animation:knead 0.3s ease-in-out 0s 4}')
-  expect(slide).toContain('.paw-r{animation:knead 0.3s ease-in-out 0.15s 4}')
-  expect(stageFor({ ...BASE, motion: 'always', activity: 'sniffing', from: 'left', to: 'left' })).not.toContain('slide-bob 0.3s')
+test('a pounce hops in place, once', () => {
+  expect(pictureFor({ ...BASE, motion: 'always', activity: 'pouncing' })).toContain('.act{animation:pounce 0.8s ease-out both}')
+  expect(pictureFor({ ...BASE, motion: 'never', activity: 'pouncing' })).not.toContain('pounce')
 })
 
-test('a pounce or a chase plays once, after the walk to the middle', () => {
-  expect(stageFor({ ...BASE, motion: 'always', activity: 'pouncing' })).toContain('.act{animation:pounce 0.8s ease-out 0s both}')
-  expect(stageFor({ ...BASE, motion: 'always', activity: 'pouncing', from: 'left' })).toContain('.act{animation:pounce 0.8s ease-out 1.2s both}')
-  const chase = stageFor({ ...BASE, motion: 'always', activity: 'chasing', from: 'right' })
-  expect(chase).toContain('@keyframes dash{0%,100%{transform:translateX(0)}50%{transform:translateX(120px)}}')
-  expect(chase).toContain('.act{animation:dash 1.2s ease-in-out 1.2s both}')
-  const still = stageFor({ ...BASE, motion: 'never', activity: 'pouncing', from: 'left' })
-  expect(still).not.toContain('pounce')
-  expect(still).toContain('<g class="spot" transform="translate(120 0)">')
+test('a chase bounces in place with a lashing tail, once, and then the tail sways on', () => {
+  const chase = pictureFor({ ...BASE, motion: 'always', activity: 'chasing' })
+  expect(chase).toContain('.act{animation:bounce 1.2s ease-in-out both}')
+  expect(chase).toContain('.tail{animation:lash 0.3s ease-in-out 4,sway 1s ease-in-out 1.2s infinite}')
+  expect(pictureFor({ ...BASE, motion: 'never', activity: 'chasing' })).not.toContain('bounce')
 })
 
-test('walking shows the side view while she moves, facing her way, then the front again', () => {
-  const right = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'peering', from: 'middle', to: 'right' })
-  expect(right).toContain('<g class="side-r" opacity="0">')
-  expect(right).toContain('<g class="side-l" opacity="0"><g transform="translate(120 0) scale(-1 1)">')
-  expect(right).toContain('.side-r{animation:shown 1.2s linear 0s}')
-  expect(right).toContain('.front{animation:hidden 1.2s linear 0s}')
-  expect(right).not.toContain('.side-l{animation')
-  expect(right).not.toContain('slide-bob 0.3s')
-  const left = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'sniffing', from: 'middle', to: 'left' })
-  expect(left).toContain('.side-l{animation:shown 1.2s linear 0s}')
-  expect(left).not.toContain('.side-r{animation')
-})
-
-test('a walking chase runs right, turns and comes back', () => {
-  const chase = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'chasing' })
-  expect(chase).toContain('.side-r{animation:shown 0.6s linear 0s}')
-  expect(chase).toContain('.side-l{animation:shown 0.6s linear 0.6s}')
-  expect(chase).toContain('.front{animation:hidden 0.6s linear 0s,hidden 0.6s linear 0.6s}')
-  const after = stageFor({ ...BASE, gait: 'walk', motion: 'always', activity: 'chasing', from: 'left' })
-  expect(after).toContain('.side-r{animation:shown 1.2s linear 0s,shown 0.6s linear 1.2s}')
-  expect(after).toContain('.side-l{animation:shown 0.6s linear 1.8s}')
-})
-
-test('only a walk that moves or chases draws the side view', () => {
-  const moving = { ...BASE, activity: 'peering', from: 'middle', to: 'right' } as const
-  expect(stageFor({ ...moving, gait: 'slide', motion: 'always' })).not.toContain('class="side-')
-  expect(stageFor({ ...moving, gait: 'walk', motion: 'never' })).not.toContain('class="side-')
-  expect(stageFor({ ...BASE, gait: 'walk', motion: 'always' })).not.toContain('class="side-')
-  expect(stageFor({ ...moving, gait: 'walk', motion: 'auto' })).toContain('prefers-reduced-motion:reduce')
+test('only a pounce or a chase moves her whole body', () => {
+  for (const activity of [null, 'sniffing', 'watching', 'peering', 'waiting'] as const) {
+    expect(pictureFor({ ...BASE, motion: 'always', activity }), String(activity)).not.toContain('.act{animation')
+  }
 })

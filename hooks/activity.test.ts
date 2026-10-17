@@ -1,5 +1,5 @@
 import { expect, test } from 'claude-code/testing'
-import { activityFor, baseName, callLine, gitStepOf, hostOf, lineFor, MOMENTS, nextStage, REST, restStage, sameStage, showing, spotFor, topicOf } from './activity'
+import { activityFor, baseName, callLine, gitStepOf, hostOf, lineFor, MOMENTS, showing, topicOf } from './activity'
 
 test('each tool maps to its activity, and every other tool to none', () => {
   const table = {
@@ -10,33 +10,6 @@ test('each tool maps to its activity, and every other tool to none', () => {
   } as const
   for (const [tool, activity] of Object.entries(table)) expect(activityFor(tool), tool).toBe(activity)
   for (const tool of ['TodoWrite', 'NotebookEdit', 'ToolSearch', 'mcp__x__y', '']) expect(activityFor(tool), tool).toBeNull()
-})
-
-test('each activity takes her to its spot, and waiting keeps hers', () => {
-  for (const from of ['left', 'middle', 'right'] as const) {
-    expect(spotFor('sniffing', from)).toBe('left')
-    expect(spotFor('peering', from)).toBe('right')
-    expect(spotFor('watching', from)).toBe('middle')
-    expect(spotFor('pouncing', from)).toBe('middle')
-    expect(spotFor('chasing', from)).toBe('middle')
-    expect(spotFor('waiting', from)).toBe(from)
-  }
-})
-
-test('a new activity starts where she stands; the same one changes nothing', () => {
-  const left = nextStage(REST, 'sniffing')
-  expect(left).toEqual({ activity: 'sniffing', from: 'middle', to: 'left' })
-  expect(nextStage(left, 'sniffing')).toBe(left)
-  expect(nextStage(left, 'peering')).toEqual({ activity: 'peering', from: 'left', to: 'right' })
-  expect(nextStage(left, 'waiting')).toEqual({ activity: 'waiting', from: 'left', to: 'left' })
-})
-
-test('an ended activity leaves her on the spot she reached', () => {
-  expect(restStage({ activity: 'peering', from: 'left', to: 'right' })).toEqual({ activity: null, from: 'right', to: 'right' })
-  expect(sameStage(REST, { ...REST })).toBe(true)
-  expect(sameStage(REST, restStage(REST))).toBe(true)
-  expect(sameStage(REST, { ...REST, from: 'left' })).toBe(false)
-  expect(sameStage(REST, { ...REST, activity: 'waiting' })).toBe(false)
 })
 
 test('a timed mood beats an activity, which beats working and the resting mood', () => {
