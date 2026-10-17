@@ -207,8 +207,12 @@ const BIB = (() => {
     up += ` L ${P(mtx, ty)} Q ${P(mvx + (mtx - mvx) * 0.2, vy + (ty - vy) * 0.8)} ${P(mvx, vy)}`
     next = [vx, vy]
   }
+  const outline = `M ${P(38, 57)}${down}${up} Q 64 53.5 60 56.5 Q 56 53.5 52 56 Q 48 53.5 44 56.5 Q 40 53.5 38 57 Z`
+  // Black fur behind the bib: its own outline in the coat, widened around the head axis,
+  // so the white tufts never reach past her and some black shows on both sides.
   return (
-    `<path d="M ${P(38, 57)}${down}${up} Q 64 53.5 60 56.5 Q 56 53.5 52 56 Q 48 53.5 44 56.5 Q 40 53.5 38 57 Z" fill="${WHITE}"/>` +
+    `<path d="${outline}" fill="url(#coat)" stroke="${RIM}" stroke-width="0.7" transform="translate(52 0) scale(1.18 1) translate(-52 0)"/>` +
+    `<path d="${outline}" fill="${WHITE}"/>` +
     `<g stroke="#cfc5b8" stroke-width="0.6" fill="none" stroke-linecap="round" opacity="0.9"><path d="M 44 61 Q 45 67 47 72"/><path d="M 60 61 Q 59 67 57 72"/><path d="M 52 62 L 52 80"/><path d="M 37 61 Q 38 65 40 68"/><path d="M 67 61 Q 66 65 64 68"/><path d="M 49 74 Q 50 78 51 81"/><path d="M 55 74 Q 54 78 53 81"/></g>`
   )
 })()

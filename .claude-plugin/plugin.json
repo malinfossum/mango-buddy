@@ -1,6 +1,6 @@
 {
   "name": "mango",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A fluffy black cat above the prompt, in memory of Mango.",
   "author": { "name": "Malin Fossum" },
   "types": "./types/index.d.ts"
