@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Mango, a long-haired black cat with a white ruff, white paws and amber eyes, lies in a loaf on a blue knitted cushion in front of a glowing orange moon." width="100%">
+  <img src="assets/banner.svg" alt="Mango, a fluffy black cat with tufted ears, golden eyes, a white bib and white paws, sits tall on a blue knitted cushion in front of a glowing orange moon." width="100%">
 </p>
 
 <p align="center">
