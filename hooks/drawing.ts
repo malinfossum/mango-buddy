@@ -1,9 +1,10 @@
-import type { Pose } from './cat'
+import type { Activity } from '../types'
+import type { Look, Pose } from './cat'
 
 // Mango as a picture for the surfaces that draw an Svg (desktop, editor, mobile). The
 // terminal keeps the ASCII frames. Drawn on a 120 x 96 grid and shown at half that, so
-// strokes stay crisp. She matches the README banner: long black coat, white ruff and
-// paws, white whiskers, amber eyes.
+// strokes stay crisp. She is drawn from photos of the real Mango: a long black coat with
+// a brown sheen, a white bib and mittens, long white whiskers and golden eyes.
 //
 // She moves by CSS inside the SVG, so the browser animates her smoothly and the markup
 // changes only when her pose does. A frame that is redrawn restarts every animation, so
@@ -13,13 +14,15 @@ import type { Pose } from './cat'
 export const DRAWING_WIDTH = 60
 export const DRAWING_HEIGHT = 48
 
-const COAT = '#1a1217'
-const RIM = '#4a3a36'
+export const COAT = '#1a1210'
+export const RIM = '#433632'
+export const WHITE = '#f4efe6'
+export const EYE = '#f0c040'
+export const PUPIL = '#0d0a10'
 const EAR = '#3a2219'
-const WHITE = '#f4efe6'
-const AMBER = '#f2a92e'
-const PUPIL = '#0d0a10'
-const NOSE = '#e58a9a'
+const TUFT = '#e0d6ca'
+const LEG = '#150f0e'
+const NOSE = '#0a0708'
 const CLOSED = '#8a6f60'
 const HEART = '#e5484d'
 
@@ -29,33 +32,195 @@ const PROUD_MARK = '#ffc24d'
 const RUFFLED_MARK = '#ff8a80'
 const WORRIED_MARK = '#8ac7ff'
 
-const DEFS = `<defs><radialGradient id="coat" cx="0.32" cy="0.28" r="0.85"><stop offset="0" stop-color="#3b2a26"/><stop offset="0.45" stop-color="#1a1418"/><stop offset="1" stop-color="#0d0a10"/></radialGradient></defs>`
+export const DEFS = `<defs><radialGradient id="coat" cx="0.32" cy="0.28" r="0.85"><stop offset="0" stop-color="#33231b"/><stop offset="0.45" stop-color="#141011"/><stop offset="1" stop-color="#09080a"/></radialGradient><radialGradient id="iris" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fde98e"/><stop offset="0.6" stop-color="${EYE}"/><stop offset="1" stop-color="#c0841c"/></radialGradient></defs>`
 
-// A raised tail for a proud cat, a low curl for every other mood.
-const tail = (isRaised: boolean): string => {
-  const d = isRaised ? 'M 78 82 C 100 82 112 70 108 54 C 106 46 100 44 96 46' : 'M 78 82 C 102 86 114 76 112 62 C 111 56 106 54 102 56'
-  return `<g class="tail"><path d="${d}" stroke="${RIM}" stroke-width="13.4" stroke-linecap="round" fill="none" opacity="0.7"/><path d="${d}" stroke="${COAT}" stroke-width="11" stroke-linecap="round" fill="none"/><path d="${d}" stroke="#3b2a26" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.6"/></g>`
+type Point = [number, number]
+
+// Coordinates are rounded to one decimal, so a path is short and the same every time.
+const r1 = (n: number): number => Math.round(n * 10) / 10
+const P = (x: number, y: number): string => `${r1(x)} ${r1(y)}`
+
+// Mirrors every point in a path around her centre line at x 52.
+const flipPath = (d: string): string => d.replace(/(-?\d+(?:\.\d+)?) (-?\d+(?:\.\d+)?)/g, (_, x: string, y: string) => `${r1(104 - Number(x))} ${y}`)
+
+// A fur outline around an ellipse: tufts with pointed tips. depth(a) is the tuft length
+// at angle a (degrees, 0 = right, 90 = down).
+const fluff = (cx: number, cy: number, rx: number, ry: number, n: number, depth: number | ((a: number) => number), lean = 0.15): string => {
+  const pt = (a: number, k: number): Point => {
+    const t = (a * Math.PI) / 180
+    return [cx + Math.cos(t) * (rx + k), cy + Math.sin(t) * (ry + k)]
+  }
+  const step = 360 / n
+  let d = `M ${P(...pt(0, 0))}`
+  for (let i = 0; i < n; i++) {
+    const a = i * step
+    const k = typeof depth === 'function' ? depth(a + step / 2) : depth
+    d += ` Q ${P(...pt(a + step * 0.3, k * 0.1))} ${P(...pt(a + step * (0.5 + lean), k))}`
+    d += ` Q ${P(...pt(a + step * 0.8, k * 0.25))} ${P(...pt(a + step, 0))}`
+  }
+  return `${d} Z`
 }
 
-const body = `<ellipse class="body" cx="52" cy="76" rx="32" ry="18" fill="url(#coat)" stroke="${RIM}" stroke-width="1.2"/>`
-
-const paws = `<ellipse class="paw-l" cx="42" cy="90" rx="8" ry="4.5" fill="${WHITE}"/><ellipse class="paw-r" cx="62" cy="90" rx="8" ry="4.5" fill="${WHITE}"/>`
-
-const ears = (isFlat: boolean): string => {
-  const [l, r, li, ri] = isFlat
-    ? ['M 30 32 L 18 18 L 42 20 Z', 'M 74 32 L 86 18 L 62 20 Z', 'M 30 27 L 23 20 L 37 21 Z', 'M 74 27 L 81 20 L 67 21 Z']
-    : ['M 28 34 L 30 6 L 48 20 Z', 'M 76 34 L 74 6 L 56 20 Z', 'M 32 28 L 33 13 L 43 21 Z', 'M 72 28 L 71 13 L 61 21 Z']
-  const ear = (side: string, outer: string, inner: string) =>
-    `<g class="perk-${side}"><g class="ear-${side}"><path d="${outer}" fill="${COAT}" stroke="${RIM}" stroke-width="1.2" stroke-linejoin="round"/><path d="${inner}" fill="${EAR}"/></g></g>`
-  return ear('l', l, li) + ear('r', r, ri)
+// A bushy plume along a cubic Bezier: w wide at its fullest, n tufts down each edge.
+const plume = (p0: Point, p1: Point, p2: Point, p3: Point, w: number, n: number, tuft: number): string => {
+  const at = (t: number) => {
+    const u = 1 - t
+    const x = u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0]
+    const y = u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1]
+    const dx = 3 * u * u * (p1[0] - p0[0]) + 6 * u * t * (p2[0] - p1[0]) + 3 * t * t * (p3[0] - p2[0])
+    const dy = 3 * u * u * (p1[1] - p0[1]) + 6 * u * t * (p2[1] - p1[1]) + 3 * t * t * (p3[1] - p2[1])
+    const l = Math.hypot(dx, dy) || 1
+    return { x, y, nx: -dy / l, ny: dx / l, tx: dx / l, ty: dy / l }
+  }
+  const width = (t: number) => w * (0.42 + 0.78 * Math.sin(Math.PI * Math.min(1, t * 0.92 + 0.04)))
+  const side = (s: number): Point[] => {
+    const pts: Point[] = []
+    for (let i = 0; i <= n * 2; i++) {
+      const t = i / (n * 2)
+      const c = at(t)
+      const isTip = i % 2 === 1
+      const half = width(t) / 2 + (isTip ? tuft : 0)
+      // Tips lean back toward the base, like fur.
+      const back = isTip ? -1.6 : 0
+      pts.push([c.x + c.nx * half * s + c.tx * back, c.y + c.ny * half * s + c.ty * back])
+    }
+    return pts
+  }
+  const left = side(1)
+  const right = side(-1).reverse()
+  const end = at(1)
+  const tip: Point = [end.x + end.tx * (width(1) / 2 + 3), end.y + end.ty * (width(1) / 2 + 3)]
+  // Each tuft bulges out to its tip, then sweeps back in to the next valley. lead is how
+  // the edge is reached: a move for the first, a curve round the tip for the second.
+  const trace = (lead: string, pts: Point[]): string => {
+    let d = ''
+    let prev: Point | null = null
+    for (const [i, [bx, by]] of pts.entries()) {
+      if (prev === null) d += `${lead} ${P(bx, by)}`
+      else {
+        const [ax, ay] = prev
+        d += i % 2 === 1 ? ` Q ${P(ax + (bx - ax) * 0.25, ay + (by - ay) * 0.75)} ${P(bx, by)}` : ` Q ${P(ax + (bx - ax) * 0.75, ay + (by - ay) * 0.25)} ${P(bx, by)}`
+      }
+      prev = [bx, by]
+    }
+    return d
+  }
+  return `${trace('M', left)}${trace(` Q ${P(...tip)}`, right)} Z`
 }
 
-// Long fur: the head is a circle with tufts at the cheeks.
-const head = `<path d="M 28 46 L 20 50 L 28 54 L 24 60 L 34 60 Z M 76 46 L 84 50 L 76 54 L 80 60 L 70 60 Z" fill="${COAT}"/><circle cx="52" cy="42" r="25" fill="url(#coat)" stroke="${RIM}" stroke-width="1.2"/>`
+// The low plume starts under her body and curls up along the floor; the raised one stands
+// up behind her for a proud cat or one on a chase. Each is fixed at its root half: a Bend
+// moves only the last two control points, so the tail bends and never slides off her.
+type Bend = [Point, Point]
+const lowPlume = ([p2, p3]: Bend): string => plume([60, 88], [88, 89], p2, p3, 10, 6, 2.2)
+const upPlume = ([p2, p3]: Bend): string => plume([74, 86], [100, 84], p2, p3, 11, 7, 2.6)
+const LOW_REST: Bend = [[108, 86], [106, 68]]
+const UP_REST: Bend = [[112, 60], [102, 40]]
 
-const ruff = `<path d="M 36 62 L 32 70 L 40 68 L 38 77 L 46 72 L 48 80 L 52 73 L 56 80 L 58 72 L 66 77 L 64 68 L 72 70 L 68 62 Q 52 70 36 62 Z" fill="${WHITE}"/>`
+const isRaised = (look: Look): boolean => look === 'proud' || look === 'chasing'
 
-const face = `<path d="M 49 49 L 55 49 L 52 52.5 Z" fill="${NOSE}"/><path d="M 52 52.5 Q 50 55 47.5 54 M 52 52.5 Q 54 55 56.5 54" stroke="${CLOSED}" stroke-width="1" fill="none" stroke-linecap="round"/><g stroke="${WHITE}" stroke-width="0.9" stroke-linecap="round" opacity="0.8"><path d="M 44 51 L 22 47"/><path d="M 44 53 L 21 54"/><path d="M 60 51 L 82 47"/><path d="M 60 53 L 83 54"/></g>`
+const tail = (raised: boolean): string =>
+  `<path class="${raised ? 'tail tail-up' : 'tail'}" d="${raised ? upPlume(UP_REST) : lowPlume(LOW_REST)}" fill="url(#coat)" stroke="${RIM}" stroke-width="1"/>`
+
+// A tail motion is a list of keyframe stops, each with the bend the tail takes there.
+// Every plume has the same points in the same order, so the browser can blend between
+// them; a browser without CSS d just shows the resting tail.
+type Stops = [string, Bend][]
+const LOW_SWAY: Stops = [['0%,100%', [[107, 87], [100, 69]]], ['50%', [[109, 87], [110, 73]]]]
+const UP_SWAY: Stops = [['0%,100%', [[110, 60], [96, 40]]], ['50%', [[112, 62], [106, 43]]]]
+// A flick whips the tip up toward her, then throws it out low.
+const FLICK: Stops = [['0%,100%', LOW_REST], ['25%', [[108, 83], [101, 60]]], ['55%', [[109, 86], [112, 77]]]]
+const SHIVER: Stops = [['0%,100%', [[108, 86], [105, 68]]], ['50%', [[108, 86], [107, 68.5]]]]
+// Only the tip taps: it lifts, drops back and settles.
+const TAP: Stops = [['0%,55%,100%', LOW_REST], ['70%', [[108, 85], [104, 63]]], ['85%', [[108, 86], [107, 70]]]]
+const LASH: Stops = [['0%,100%', [[108, 60], [92, 41]]], ['50%', [[112, 63], [109, 46]]]]
+
+const tailKeyframes = (name: string, raised: boolean, stops: Stops): string =>
+  `@keyframes ${name}{${stops.map(([at, bend]) => `${at}{d:path("${raised ? upPlume(bend) : lowPlume(bend)}")}`).join('')}}`
+
+// A chase lashes the raised tail before it sways on.
+export const LASH_KEYFRAMES = tailKeyframes('lash', true, LASH)
+
+// Sitting tall: a fluffy body, smooth along the floor, with her front legs before it.
+const LEGS = `<path d="M 38.5 70 L 38.5 90 L 48.5 90 L 48.5 72 Z M 65.5 70 L 65.5 90 L 55.5 90 L 55.5 72 Z" fill="${LEG}" stroke="${RIM}" stroke-width="0.8" stroke-linejoin="round"/>`
+const BODY = `<g class="body"><path d="${fluff(52, 79, 26, 16, 16, a => (Math.sin((a * Math.PI) / 180) > 0.6 ? 0.4 : 2.8))}" fill="url(#coat)" stroke="${RIM}" stroke-width="1"/>${LEGS}</g>`
+
+// White mittens over the toes.
+const mitten = (cx: number, cy: number): string =>
+  `<ellipse cx="${cx}" cy="${cy}" rx="5.6" ry="3.4" fill="${WHITE}"/><path d="M ${cx - 1.8} ${cy - 1} L ${cx - 1.8} ${cy + 2.6} M ${cx + 1.8} ${cy - 1} L ${cx + 1.8} ${cy + 2.6}" stroke="#cfc6ba" stroke-width="0.6"/>`
+const PAWS = `<g class="paw-l">${mitten(43.5, 91)}</g><g class="paw-r">${mitten(60.5, 91)}</g>`
+
+type Ears = 'up' | 'flat' | 'forward'
+
+// The left ear of each kind; the right one is its mirror image.
+const EAR_SHAPES: Record<Ears, { outer: string; inner: string; tufts: string[] }> = {
+  up: { outer: 'M 29 33 L 31 6 L 48 22 Z', inner: 'M 33 28 L 34 13 L 43 22 Z', tufts: ['M 35 27 Q 34 21 35 15', 'M 37 27 Q 37 21 38 17', 'M 39 26 Q 40 22 41 19'] },
+  flat: { outer: 'M 30 32 L 17 18 L 43 21 Z', inner: 'M 30 27 L 23 20.5 L 38 22 Z', tufts: ['M 31 26 Q 27 23.5 24.5 21.5', 'M 33 25 Q 30 23 27.5 21.8'] },
+  // Pricked forward for a cat that peers: taller, narrower, turned in.
+  forward: { outer: 'M 30 32 L 35 3 L 49 21 Z', inner: 'M 34 27 L 36 10 L 44 22 Z', tufts: ['M 36 26 Q 36 19 37 13', 'M 38 26 Q 39 20 40 16', 'M 40 25 Q 41 22 42 19'] },
+}
+
+const earShape = (outer: string, inner: string, tufts: string[]): string =>
+  `<path d="${outer}" fill="${COAT}" stroke="${RIM}" stroke-width="1" stroke-linejoin="round"/><path d="${inner}" fill="${EAR}"/><g stroke="${TUFT}" stroke-width="0.6" stroke-linecap="round" opacity="0.85">${tufts.map(t => `<path d="${t}"/>`).join('')}</g>`
+
+const EARS = Object.fromEntries(
+  (Object.keys(EAR_SHAPES) as Ears[]).map(kind => {
+    const { outer, inner, tufts } = EAR_SHAPES[kind]
+    const side = (s: string, shape: string) => `<g class="perk-${s}"><g class="ear-${s}">${shape}</g></g>`
+    return [kind, side('l', earShape(outer, inner, tufts)) + side('r', earShape(flipPath(outer), flipPath(inner), tufts.map(flipPath)))]
+  }),
+) as Record<Ears, string>
+
+const ears = (kind: Ears): string => EARS[kind]
+
+const earsFor = (look: Look): Ears => (look === 'ruffled' ? 'flat' : look === 'peering' ? 'forward' : 'up')
+
+// Long fur: the ruff stands out widest at the cheeks, and the crown stays short.
+const HEAD = `<path d="${fluff(
+  52,
+  40,
+  20,
+  17.5,
+  18,
+  a => {
+    const c = Math.abs(Math.cos((a * Math.PI) / 180))
+    const s = Math.sin((a * Math.PI) / 180)
+    return s < -0.4 ? 1.2 : 2 + 6 * c * c * (s > -0.1 ? 1 : 0.5) + 2 * Math.max(0, s)
+  },
+  0.3,
+)}" fill="url(#coat)" stroke="${RIM}" stroke-width="0.8"/>`
+
+// A big white bib from under her chin to a point on her chest. Each tuft down the left
+// edge is the valley it starts from and its tip; it bulges out to the tip and snaps back
+// in a straight line to the next valley, like a lock of fur. The last valley is the point.
+const BIB_TUFTS: [Point, Point][] = [[[38, 57], [30, 62]], [[34, 64], [30, 70]], [[36, 70], [34, 76]], [[41, 75], [42, 81]], [[46, 80], [49, 85]]]
+
+const BIB = (() => {
+  let down = ''
+  let up = ''
+  let next: Point = [52, 84]
+  for (const [[vx, vy], [tx, ty]] of [...BIB_TUFTS].reverse()) {
+    const [nx, ny] = next
+    down = ` Q ${P(vx + (tx - vx) * 0.2, vy + (ty - vy) * 0.8)} ${P(tx, ty)} L ${P(nx, ny)}${down}`
+    // The right edge mirrors it on the way back up: tip first, then the valley.
+    const [mtx, mvx] = [104 - tx, 104 - vx]
+    up += ` L ${P(mtx, ty)} Q ${P(mvx + (mtx - mvx) * 0.2, vy + (ty - vy) * 0.8)} ${P(mvx, vy)}`
+    next = [vx, vy]
+  }
+  return (
+    `<path d="M ${P(38, 57)}${down}${up} Q 64 53.5 60 56.5 Q 56 53.5 52 56 Q 48 53.5 44 56.5 Q 40 53.5 38 57 Z" fill="${WHITE}"/>` +
+    `<g stroke="#cfc5b8" stroke-width="0.6" fill="none" stroke-linecap="round" opacity="0.9"><path d="M 44 61 Q 45 67 47 72"/><path d="M 60 61 Q 59 67 57 72"/><path d="M 52 62 L 52 80"/><path d="M 37 61 Q 38 65 40 68"/><path d="M 67 61 Q 66 65 64 68"/><path d="M 49 74 Q 50 78 51 81"/><path d="M 55 74 Q 54 78 53 81"/></g>`
+  )
+})()
+
+// A black nose, the mouth, three long whiskers a cheek and two brow whiskers above each eye.
+const FACE =
+  `<path d="M 49 47.6 Q 52 46.8 55 47.6 Q 54 50.2 52 51.2 Q 50 50.2 49 47.6 Z" fill="${NOSE}" stroke="#4a3a34" stroke-width="0.6"/><ellipse cx="51" cy="48.2" rx="1" ry="0.45" fill="#7a6a64" opacity="0.7"/>` +
+  `<path d="M 52 51.2 L 52 52.6 Q 50 54.6 47.8 53.8 M 52 52.6 Q 54 54.6 56.2 53.8" stroke="#5a4842" stroke-width="0.8" fill="none" stroke-linecap="round"/>` +
+  `<g stroke="${WHITE}" stroke-width="0.75" fill="none" stroke-linecap="round" opacity="0.9">` +
+  `<path d="M 46 50.5 Q 32 45.8 19.5 44.2"/><path d="M 46 52 Q 32 50.8 17.5 52"/><path d="M 46 53.5 Q 32 55.6 20.5 59"/>` +
+  `<path d="M 58 50.5 Q 72 45.8 84.5 44.2"/><path d="M 58 52 Q 72 50.8 86.5 52"/><path d="M 58 53.5 Q 72 55.6 83.5 59"/>` +
+  `<path d="M 38.5 32.8 Q 34 30.8 30 30"/><path d="M 40.5 32.2 Q 36.5 30 33 29.2"/><path d="M 65.5 32.8 Q 70 30.8 74 30"/><path d="M 63.5 32.2 Q 67.5 30 71 29.2"/></g>`
 
 type Eyes = 'open' | 'closed' | 'happy' | 'squint' | 'wide'
 
@@ -63,15 +228,15 @@ const eyeShapes = (kind: Eyes): string => {
   const pair = (draw: (cx: number) => string) => draw(42) + draw(62)
   switch (kind) {
     case 'open':
-      return pair(cx => `<ellipse cx="${cx}" cy="40" rx="6.5" ry="5.5" fill="${AMBER}"/><g class="pupil"><ellipse cx="${cx}" cy="40" rx="1.6" ry="4.6" fill="${PUPIL}"/><circle cx="${cx + 2}" cy="38" r="1.2" fill="${WHITE}"/></g>`)
+      return pair(cx => `<circle cx="${cx}" cy="40" r="6.6" fill="url(#iris)" stroke="#5a3a10" stroke-width="0.8"/><g class="pupil"><ellipse cx="${cx}" cy="40" rx="2.3" ry="4.9" fill="${PUPIL}"/><circle cx="${cx + 2.3}" cy="37.6" r="1.4" fill="${WHITE}"/></g>`)
     case 'wide':
-      return pair(cx => `<circle cx="${cx}" cy="40" r="7" fill="${AMBER}"/><g class="pupil"><circle cx="${cx}" cy="40" r="2.2" fill="${PUPIL}"/><circle cx="${cx + 2.4}" cy="37.6" r="1.3" fill="${WHITE}"/></g>`)
+      return pair(cx => `<circle cx="${cx}" cy="40" r="7.2" fill="url(#iris)" stroke="#5a3a10" stroke-width="0.8"/><g class="pupil"><circle cx="${cx}" cy="40" r="3.1" fill="${PUPIL}"/><circle cx="${cx + 2.5}" cy="37.4" r="1.5" fill="${WHITE}"/></g>`)
     case 'closed':
-      return pair(cx => `<path d="M ${cx - 6} 40 Q ${cx} 45 ${cx + 6} 40" stroke="${CLOSED}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`)
+      return pair(cx => `<path d="M ${cx - 5.5} 40 Q ${cx} 44.5 ${cx + 5.5} 40" stroke="${CLOSED}" stroke-width="2" fill="none" stroke-linecap="round"/>`)
     case 'happy':
-      return pair(cx => `<path d="M ${cx - 6} 43 Q ${cx} 35 ${cx + 6} 43" stroke="${AMBER}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`)
+      return pair(cx => `<path d="M ${cx - 5.5} 42.5 Q ${cx} 34.5 ${cx + 5.5} 42.5" stroke="${EYE}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`)
     case 'squint':
-      return `<path d="M 36 36 L 47 40 L 36 44" stroke="${AMBER}" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M 68 36 L 57 40 L 68 44" stroke="${AMBER}" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+      return `<g stroke="${EYE}" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M 37 36 L 47 40 L 37 44"/><path d="M 67 36 L 57 40 L 67 44"/></g>`
   }
 }
 
@@ -81,8 +246,8 @@ const eyes = (kind: Eyes): string => `<g class="look"><g class="eyes">${eyeShape
 const zMark = (x: number, y: number, s: number, cls = ''): string =>
   `<path${cls === '' ? '' : ` class="${cls}"`} d="M ${x} ${y} h ${s} l ${-s} ${s * 1.1} h ${s}" stroke="${SLEEP_MARK}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
 
-const mark = (pose: Pose, isAnimated: boolean): string => {
-  switch (pose) {
+const mark = (look: Look, isAnimated: boolean): string => {
+  switch (look) {
     case 'sleeping':
       // Moving, three small z drift up from the same spot in turn; still, two sit apart.
       return isAnimated ? zMark(84, 24, 6, 'z z1') + zMark(84, 24, 6, 'z z2') + zMark(84, 24, 6, 'z z3') : zMark(84, 26, 6) + zMark(98, 10, 8)
@@ -101,18 +266,24 @@ const mark = (pose: Pose, isAnimated: boolean): string => {
 // without the style sheet never shows it.
 const heart = `<path class="heart" opacity="0" d="M 96 14 C 96 10 91 9 90 13 C 89 9 84 10 84 14 C 84 18 90 21 90 23 C 90 21 96 18 96 14 Z" fill="${HEART}"/>`
 
-const eyesFor = (pose: Pose): Eyes => {
-  switch (pose) {
+const eyesFor = (look: Look): Eyes => {
+  switch (look) {
     case 'awake':
     case 'working':
+    case 'sniffing':
+    case 'watching':
       return 'open'
     case 'sleeping':
+    case 'waiting':
       return 'closed'
     case 'ruffled':
       return 'squint'
     case 'proud':
+    case 'pouncing':
       return 'happy'
     case 'worried':
+    case 'peering':
+    case 'chasing':
       return 'wide'
   }
 }
@@ -124,9 +295,6 @@ const KEYFRAMES = [
   '@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-0.8px)}}',
   '@keyframes sink{0%,100%{transform:translateY(0)}50%{transform:translateY(1.2px)}}',
   '@keyframes blink{0%,44%,48%,86%,89%,92%,100%{transform:scaleY(1)}46%,87.5%,90.5%{transform:scaleY(0.1)}}',
-  '@keyframes sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(7deg)}}',
-  '@keyframes flick{0%,100%{transform:rotate(0)}25%{transform:rotate(16deg)}55%{transform:rotate(-8deg)}}',
-  '@keyframes shiver{0%,100%{transform:rotate(-1.5deg)}50%{transform:rotate(1.5deg)}}',
   '@keyframes twitch-l{0%,58%,66%,100%{transform:rotate(0)}61%{transform:rotate(-14deg)}}',
   '@keyframes twitch-r{0%,22%,30%,100%{transform:rotate(0)}25%{transform:rotate(14deg)}}',
   '@keyframes knead{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}',
@@ -138,9 +306,14 @@ const KEYFRAMES = [
   '@keyframes love{0%{opacity:0;transform:translateY(4px) scale(0.6)}25%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-8px) scale(1)}}',
 ].join('')
 
+// Keyframes only the activity looks use. Kept apart so the single drawing stays as it is.
+const LOOK_KEYFRAMES = [
+  '@keyframes sniff{0%,100%{transform:translateY(0)}50%{transform:translateY(1.5px)}}',
+  '@keyframes follow{0%,100%{transform:translateX(-2.5px)}50%{transform:translateX(2.5px)}}',
+].join('')
+
 const ORIGINS = [
   '.body{transform-origin:52px 94px}',
-  '.tail{transform-origin:78px 82px}',
   '.eyes,.look{transform-origin:52px 40px}',
   '.ear-l,.perk-l{transform-origin:38px 30px}',
   '.ear-r,.perk-r{transform-origin:66px 30px}',
@@ -153,19 +326,21 @@ const ORIGINS = [
 const HOVER = 'svg:hover .perk-l{transform:rotate(6deg) translateY(-1px)}svg:hover .perk-r{transform:rotate(-6deg) translateY(-1px)}svg:hover .look{transform:scale(1.08)}svg:hover .heart{animation:love 1.8s ease-out infinite}'
 
 // Without motion the three z would sit on one spot, so they spread out as a still picture.
-const REDUCED = '@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.z2{transform:translate(7px,-8px)}.z3{transform:translate(14px,-16px)}}'
+export const REDUCED = '@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.z2{transform:translate(7px,-8px)}.z3{transform:translate(14px,-16px)}}'
 
-const motionFor = (pose: Pose): string => {
+const motionFor = (look: Look): string => {
   const breath = (name: string, seconds: number) => `.body{animation:${name} ${seconds}s ease-in-out infinite}.head{animation:${name === 'deep' ? 'sink' : 'bob'} ${seconds}s ease-in-out infinite}`
-  const tailMoves = (name: string, seconds: number, timing = 'ease-in-out') => `.tail{animation:${name} ${seconds}s ${timing} infinite}`
+  const raised = isRaised(look)
+  const tailMoves = (name: string, stops: Stops, seconds: number) => `${tailKeyframes(name, raised, stops)}.tail{animation:${name} ${seconds}s ease-in-out infinite}`
+  const sway = raised ? UP_SWAY : LOW_SWAY
   const blink = '.eyes{animation:blink 6.8s linear infinite}'
   const earTwitch = '.ear-l{animation:twitch-l 9s ease-in-out infinite}.ear-r{animation:twitch-r 11s ease-in-out infinite}'
-  switch (pose) {
+  switch (look) {
     case 'awake':
-      return breath('breathe', 3.2) + tailMoves('sway', 4.4) + blink + earTwitch
+      return breath('breathe', 3.2) + tailMoves('sway', sway, 4.4) + blink + earTwitch
     case 'working':
       return (
-        breath('breathe', 3.2) + tailMoves('sway', 2.6) + blink + earTwitch +
+        breath('breathe', 3.2) + tailMoves('sway', sway, 2.6) + blink + earTwitch +
         '.paw-l{animation:knead 0.9s ease-in-out infinite}.paw-r{animation:knead 0.9s ease-in-out -0.45s infinite}'
       )
     case 'sleeping':
@@ -175,21 +350,73 @@ const motionFor = (pose: Pose): string => {
         '.z{animation:drift 3.6s ease-out infinite}.z2{animation-delay:-1.2s}.z3{animation-delay:-2.4s}'
       )
     case 'proud':
-      return breath('breathe', 3.2) + tailMoves('sway', 3.6) + '.mark{animation:twinkle 1.6s ease-in-out infinite}'
+      return breath('breathe', 3.2) + tailMoves('sway', sway, 3.6) + '.mark{animation:twinkle 1.6s ease-in-out infinite}'
     case 'ruffled':
-      return breath('breathe', 1.6) + tailMoves('flick', 0.9) + '.mark{animation:pulse 0.6s ease-in-out infinite}'
+      return breath('breathe', 1.6) + tailMoves('flick', FLICK, 0.9) + '.mark{animation:pulse 0.6s ease-in-out infinite}'
     case 'worried':
       return (
-        breath('breathe', 2.2) + tailMoves('shiver', 1.2) + blink +
+        breath('breathe', 2.2) + tailMoves('shiver', SHIVER, 1.2) + blink +
         '.pupil{animation:glance 4s ease-in-out infinite}.mark{animation:drip 2.4s ease-in infinite}'
       )
+    case 'sniffing':
+      // Head low, nose working: the head dips in quick small sniffs.
+      return '.body{animation:breathe 3.2s ease-in-out infinite}.head{animation:sniff 0.6s ease-in-out infinite}' + tailMoves('sway', sway, 4.4)
+    case 'watching':
+      return breath('breathe', 3.2) + tailMoves('sway', sway, 4.4) + blink + '.pupil{animation:follow 2.4s ease-in-out infinite}'
+    case 'peering':
+      return breath('breathe', 2.6) + tailMoves('sway', sway, 3) + '.ear-l{animation:twitch-l 3s ease-in-out infinite}.ear-r{animation:twitch-r 3.4s ease-in-out infinite}'
+    case 'waiting':
+      // She sits with her eyes closed; only the tail tip taps.
+      return breath('breathe', 4) + tailMoves('tap', TAP, 1.4)
+    case 'pouncing':
+      return breath('breathe', 1.6) + tailMoves('flick', FLICK, 0.9)
+    case 'chasing':
+      return breath('breathe', 1.2) + tailMoves('sway', sway, 1)
   }
 }
 
-const styleFor = (pose: Pose): string => `<style>${KEYFRAMES}${ORIGINS}${motionFor(pose)}${HOVER}${REDUCED}</style>`
+// A look's style for the picture: no hover rules, which a picture drawn as an image never
+// gets, and no reduced-motion query, which the picture adds or leaves out by the motion
+// setting. The heart's keyframes and origin ride along unused: drawingFor shares them.
+export const frontStyle = (look: Look): string => `${KEYFRAMES}${LOOK_KEYFRAMES}${ORIGINS}${motionFor(look)}`
 
-// What a reader that cannot see the picture is told: the same mood the ASCII shows.
-export const altFor = (pose: Pose): string => {
+// The front view's markup on the 120 x 96 grid, without the <svg> around it, a style or
+// the heart (the picture has no hover).
+// Sniffing lowers her head over her chest and leaves the bib where it is; everything else
+// about a look is in its eyes, ears and motion.
+export const frontView = (look: Look, isAnimated: boolean): string => {
+  const face = `${eyes(eyesFor(look))}${FACE}`
+  const earPair = ears(earsFor(look))
+  return (
+    tail(isRaised(look)) +
+    BODY +
+    PAWS +
+    (look === 'sniffing'
+      ? `${BIB}<g transform="translate(0 11)"><g class="head">${earPair}${HEAD}${face}</g></g>`
+      : `<g class="head">${earPair}${HEAD}${BIB}${face}</g>`) +
+    mark(look, isAnimated)
+  )
+}
+
+// What a reader that cannot see the picture is told: the activity when one shows, else
+// the same mood the ASCII shows.
+export const altFor = (pose: Pose, activity: Activity | null = null): string => {
+  switch (activity) {
+    case 'sniffing':
+      return 'Mango, a black cat, sniffs around.'
+    case 'watching':
+      return 'Mango, a black cat, watches the code change.'
+    case 'peering':
+      return 'Mango, a black cat, peers out at the web.'
+    case 'waiting':
+      return 'Mango, a black cat, sits and waits.'
+    case 'pouncing':
+      return 'Mango, a black cat, pounces on the commit.'
+    case 'chasing':
+      return 'Mango, a black cat, chases the push.'
+    case null:
+      break
+  }
   switch (pose) {
     case 'awake':
       return 'Mango, a black cat, is awake.'
@@ -206,20 +433,11 @@ export const altFor = (pose: Pose): string => {
   }
 }
 
+// The single drawing, as the README art and v1 drew it, heart and hover included.
 export const drawingFor = (pose: Pose, isAnimated: boolean): string =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 96" width="120" height="96">` +
   DEFS +
-  (isAnimated ? styleFor(pose) : '') +
-  tail(pose === 'proud') +
-  body +
-  paws +
-  `<g class="head">` +
-  ears(pose === 'ruffled') +
-  head +
-  ruff +
-  eyes(eyesFor(pose)) +
-  face +
-  `</g>` +
-  mark(pose, isAnimated) +
+  (isAnimated ? `<style>${KEYFRAMES}${ORIGINS}${motionFor(pose)}${HOVER}${REDUCED}</style>` : '') +
+  frontView(pose, isAnimated) +
   heart +
   `</svg>`

@@ -1,8 +1,11 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
-import type { Mood } from '../types'
+import type { Activity, Mood, Motion } from '../types'
+import { ACTIVITY_TICKS, activityFor, callLine, gitStepOf, KEEP_WATCH_TICKS, LINE_GAP_TICKS, lineFor, showing, topicOf } from './activity'
+import type { Topic } from './activity'
 import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS, toneFor } from './cat'
-import { altFor, DRAWING_HEIGHT, DRAWING_WIDTH, drawingFor } from './drawing'
+import { altFor, DRAWING_HEIGHT, DRAWING_WIDTH } from './drawing'
+import { pictureFor } from './stage'
 
 type EngineType = EngineInterface
 
@@ -16,7 +19,11 @@ export const isSessionCounted = atom({ plugin: 'mango', key: 'isSessionCounted' 
 export const wasOverBudget = atom({ plugin: 'mango', key: 'wasOverBudget' } as const, false)
 export const isOff = atom({ plugin: 'mango', key: 'isOff' } as const, false)
 export const isMuted = atom({ plugin: 'mango', key: 'isMuted' } as const, false)
-export const isStill = atom({ plugin: 'mango', key: 'isStill' } as const, false)
+// How she moves, stored. Read once in session.start, written on change.
+export const motion = atom({ plugin: 'mango', key: 'motion' } as const, 'auto' as Motion)
+// What the desktop picture shows over her mood. Written at most once per clock period,
+// so a burst of tool calls is one write and one redraw.
+export const activity = atom({ plugin: 'mango', key: 'activity' } as const, null as Activity | null)
 // The mood the picture surfaces draw. They never read the tick, which the clock writes
 // every period: each redraw rebuilds the picture's frame, and that shows as a blink.
 export const shownMood = atom({ plugin: 'mango', key: 'shownMood' } as const, 'awake' as Mood)
@@ -24,6 +31,8 @@ export const shownMood = atom({ plugin: 'mango', key: 'shownMood' } as const, 'a
 const FACE_WIDTH = 5
 
 const flag = (x: unknown): boolean => x === true
+
+const motionOf = (x: unknown): Motion | undefined => (x === 'auto' || x === 'always' || x === 'never' ? x : undefined)
 
 // The clock's own count. In still mode the tick atom is only written on a mood
 // change, so time is kept here and the atom follows it.
@@ -39,6 +48,74 @@ let sleepRemark: string | null = null
 
 // The mood the clock saw on its previous period, to spot the move into sleeping.
 let lastMood: Mood = 'awake'
+
+// The activity the picture shows (the last one written) and the one the next clock period
+// writes. Tool calls set only the pending one, so a burst of them costs one redraw.
+let shownActivity: Activity | null = null
+let pendingActivity: Activity | null = null
+
+// The clock tick the activity ends on, unless a Bash or Agent call still runs.
+let activityUntil = 0
+let runningWaits = 0
+
+// The activity line showing, kept so the end of an activity clears only that line.
+let activityRemark: string | null = null
+// The tick of the last activity line; one per LINE_GAP_TICKS at most.
+let lastLineTick = -LINE_GAP_TICKS
+// What she has named this turn: one line each for reading, editing and the web.
+const namedThisTurn = new Set<Topic>()
+
+// Sets what she does next and restarts its timer. The clock writes it. The same activity
+// writes nothing, so a burst of Reads, or a second commit that returns within one clock
+// period, draws nothing new and never restarts her motion.
+const setActivity = (a: Activity) => {
+  pendingActivity = a
+  activityUntil = clockTick + ACTIVITY_TICKS
+}
+
+// Bookkeeping around a tool call never blocks it: a failed read or write is dropped.
+const quietly = async (work: () => Promise<unknown>): Promise<void> => {
+  try {
+    await work()
+  } catch {
+    // the call goes on
+  }
+}
+
+// Writes the pending activity once, and only when it differs from the one showing. A
+// failed write is tried again on the next period.
+const writeActivity = async ($: EngineType) => {
+  const a = pendingActivity
+  if (a === shownActivity) return
+  await update($, activity, () => a)
+  shownActivity = a
+}
+
+// Shows an activity line: one per LINE_GAP_TICKS at most, and only over an empty remark,
+// the sleep remark or an older activity line, never over a purr, yawn, worried or
+// timed-mood line. The slot is claimed before the first await, so two parallel calls
+// cannot both speak; a line that may not show gives it back.
+const say = async ($: EngineType, line: string) => {
+  const t = clockTick
+  if (t - lastLineTick < LINE_GAP_TICKS) return
+  const before = lastLineTick
+  lastLineTick = t
+  const current = await read($, remark)
+  if (current !== null && current !== sleepRemark && current !== activityRemark) {
+    lastLineTick = before
+    return
+  }
+  activityRemark = line
+  await update($, remark, () => line)
+}
+
+// Clears the activity line if it is still the one showing. The end of an activity calls this.
+const clearActivityRemark = async ($: EngineType) => {
+  if (activityRemark === null) return
+  const line = activityRemark
+  activityRemark = null
+  if ((await read($, remark)) === line) await update($, remark, () => null)
+}
 
 const snapshot = async ($: EngineType, t: number) => ({
   mood: await read($, mood),
@@ -71,6 +148,22 @@ export const markActivity = async ($: EngineType) => {
   await syncShownMood($)
 }
 
+// Runs a Bash or Agent call while she waits for it. The count keeps the activity from
+// ending while any such call runs, and each return restarts the timer. The count is
+// raised and lowered around nothing but the call, so it always comes back down.
+const whileWaiting = async <T,>($: EngineType, run: () => Promise<T>): Promise<T> => {
+  runningWaits += 1
+  try {
+    setActivity('waiting')
+    return await run()
+  } finally {
+    runningWaits -= 1
+    activityUntil = clockTick + ACTIVITY_TICKS
+    // A long run must not leave her asleep the moment it ends.
+    await quietly(() => markActivity($))
+  }
+}
+
 // Reads the count, adds one and writes it back at the moment of change.
 const bump = async ($: EngineType, key: string): Promise<number> => {
   const value = (Number(await $.store.get(key)) || 0) + 1
@@ -78,7 +171,13 @@ const bump = async ($: EngineType, key: string): Promise<number> => {
   return value
 }
 
-const HELP = 'Mango knows: pet, mute, unmute, still, move, off, on, card.'
+const HELP = 'Mango knows: pet, mute, unmute, still, move, auto, off, on, card.'
+
+// Stores how she moves and redraws her with it.
+const setMotion = async ($: EngineType, value: Motion): Promise<void> => {
+  await $.store.set('motion', value)
+  await update($, motion, () => value)
+}
 
 export const runCommand = async ($: EngineType, args: string): Promise<string> => {
   const word = args.trim().toLowerCase().split(/\s+/)[0] ?? ''
@@ -97,13 +196,14 @@ export const runCommand = async ($: EngineType, args: string): Promise<string> =
       await update($, isMuted, () => false)
       return 'Mango may speak again.'
     case 'still':
-      await $.store.set('isStill', true)
-      await update($, isStill, () => true)
+      await setMotion($, 'never')
       return 'Mango sits still.'
     case 'move':
-      await $.store.set('isStill', false)
-      await update($, isStill, () => false)
-      return 'Mango moves again.'
+      await setMotion($, 'always')
+      return 'Mango always moves.'
+    case 'auto':
+      await setMotion($, 'auto')
+      return 'Mango follows your system.'
     case 'off':
       await $.store.set('isOff', true)
       await update($, isOff, () => true)
@@ -137,6 +237,8 @@ const advanceClock = async ($: EngineType) => {
   clockTick += 1
   const t = clockTick
   let s = await snapshot($, t)
+  // While a Bash or Agent call runs she is busy waiting, so she does not fall asleep.
+  if (runningWaits > 0) s = { ...s, lastActivityTick: t }
   if ((s.mood === 'ruffled' || s.mood === 'proud') && t >= s.moodUntil) {
     // The timed mood is over: fall back to awake and drop its remark, once.
     await update($, mood, () => 'awake')
@@ -146,7 +248,7 @@ const advanceClock = async ($: EngineType) => {
   }
   const now = resolveMood(s)
   await showMood($, now)
-  if (await read($, isStill)) {
+  if ((await read($, motion)) === 'never') {
     const stored = await read($, tick)
     if (now !== resolveMood({ ...s, tick: stored })) await update($, tick, () => t)
   } else {
@@ -162,6 +264,11 @@ const advanceClock = async ($: EngineType) => {
     await clearSleepRemark($)
   }
   lastMood = now
+  if (runningWaits === 0 && t >= activityUntil && pendingActivity !== null) {
+    pendingActivity = null
+    await clearActivityRemark($)
+  }
+  await writeActivity($)
 }
 
 // Reads the context figure the way turn.complete does. Undefined when usage has no figure.
@@ -191,15 +298,26 @@ export const register: Register = on => {
     await $.command.register({
       name: 'mango',
       description: 'Pet Mango, or tell her to be still, quiet or away.',
-      argumentHint: 'pet | mute | unmute | still | move | off | on | card',
+      argumentHint: 'pet | mute | unmute | still | move | auto | off | on | card',
+    })
+    // A repeated session.start picks up the activity the picture already shows.
+    await quietly(async () => {
+      shownActivity = await read($, activity)
+      pendingActivity = shownActivity
     })
 
     const storedOff = flag(await $.store.get('isOff'))
     const storedMuted = flag(await $.store.get('isMuted'))
-    const storedStill = flag(await $.store.get('isStill'))
+    // An old still flag becomes motion: never, written once; isStill is not read after that.
+    let storedMotion = motionOf(await $.store.get('motion'))
+    if (storedMotion === undefined && flag(await $.store.get('isStill'))) {
+      storedMotion = 'never'
+      await $.store.set('motion', storedMotion)
+    }
+    const moves = storedMotion ?? 'auto'
     await update($, isOff, () => storedOff)
     await update($, isMuted, () => storedMuted)
-    await update($, isStill, () => storedStill)
+    await update($, motion, () => moves)
 
     if (!(await read($, isSessionCounted))) {
       await bump($, 'sessions')
@@ -219,16 +337,58 @@ export const register: Register = on => {
   on('command.run', { command: 'mango' }, async ($, e) => ({ text: await runCommand($, e.args) }))
     .catch(() => ({ text: 'Mango could not do that.' }))
 
+  // Reading, editing and the web: she sniffs, watches or peers.
+  on('tool.call', { tool: ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'WebFetch', 'WebSearch'] }, async ($, e, next) => {
+    const a = activityFor(e.tool)
+    if (a !== null) setActivity(a)
+    // The first-of-turn flag is spent before the first await, so two parallel calls
+    // cannot both claim it. A call with nothing to name spends it too.
+    let line: string | null = null
+    const topic = topicOf(e.tool)
+    if (topic !== null && !namedThisTurn.has(topic)) {
+      namedThisTurn.add(topic)
+      line = callLine(e, clockTick)
+    }
+    await quietly(() => markActivity($))
+    if (line !== null) {
+      const said = line
+      await quietly(() => say($, said))
+    }
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('tool.call', { tool: 'Agent' }, async ($, e, next) =>
+    whileWaiting($, async () => {
+      await quietly(() => markActivity($))
+      return next(e)
+    }),
+  ).catch(($, e, next) => next(e))
+
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
-    await markActivity($)
+    const started = clockTick
     const isTest = isTestCommand(e.command)
-    const ran = await next(e)
+    const step = gitStepOf(e.command)
+    const ran = await whileWaiting($, async () => {
+      await quietly(() => markActivity($))
+      return next(e)
+    })
     if (ran.deny !== undefined) return ran
     if (ran.isError === true) {
       await setTimedMood($, 'ruffled', RUFFLED_TICKS)
       await bump($, 'errorsSurvived')
-    } else if (isTest) {
-      await setTimedMood($, 'proud', PROUD_TICKS)
+      return ran
+    }
+    if (isTest) await setTimedMood($, 'proud', PROUD_TICKS)
+    // A commit or push that went through: she pounces on it, or chases it out.
+    if (step !== null) {
+      setActivity(step === 'push' ? 'chasing' : 'pouncing')
+      await quietly(() => say($, lineFor(step, clockTick)))
+    }
+    // Measured in clock ticks between the call and its result, so tests can drive it.
+    const ticks = clockTick - started
+    if (ticks > KEEP_WATCH_TICKS) {
+      const seconds = String(Math.round((ticks * TICK_MS) / 1000))
+      await quietly(() => say($, lineFor('watch', clockTick, seconds)))
     }
     return ran
   }).catch(($, e, next) => next(e))
@@ -260,6 +420,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => next(e))
 
   on('prompt.submit', async ($, e, next) => {
+    namedThisTurn.clear()
     await markActivity($)
     await update($, remark, () => null)
     return next(e)
@@ -273,20 +434,24 @@ export const register: Register = on => {
     // read the shown mood, so an idle clock period never redraws them.
     const t = isTerminal ? await read($, tick) : 0
     const shown = isTerminal ? resolveMood(await snapshot($, t)) : await read($, shownMood)
-    const still = await read($, isStill)
-    // In still mode the tick can sit on a blink frame (0 % 8), which would draw an awake
-    // cat with closed eyes. Nudge by two so the tail and the z keep their parity.
+    const drawnActivity = await read($, activity)
+    const moves = await read($, motion)
+    const still = moves === 'never'
+    // Still, the tick can sit on a blink frame (0 % 8), which would draw an awake cat with
+    // closed eyes. Nudge by two so the tail and the z keep their parity.
     const drawTick = still && t % 8 === 0 ? t + 2 : t
     const said = await read($, remark)
     const muted = await read($, isMuted)
-    const pose = e.props.isWorking ? 'working' : shown
+    // Priority, highest first: a timed mood, an activity, working, the resting mood.
+    const now = showing(shown, drawnActivity, e.props.isWorking)
+    const look = now.activity ?? now.pose
     const isShort = e.props.maxRows < 3
     // The face is 5 columns wide, the two-row art ART_WIDTH. A band narrower than
     // the art draws the art with an empty line, never a negative slice.
     const room = Math.max(0, e.props.bodyColumns - (isShort ? FACE_WIDTH : ART_WIDTH) - GAP)
     const text = (said ?? `context ${await read($, contextPercent)} %`).slice(0, room)
-    // A remark takes the mood's theme colour; the context figure stays dim.
-    const tone = said === null ? {} : { color: toneFor(pose) }
+    // A remark takes the look's theme colour; the context figure stays dim.
+    const tone = said === null ? {} : { color: toneFor(look) }
     const speech = muted ? null : (
       <>
         <Text>{' '.repeat(GAP)}</Text>
@@ -296,14 +461,16 @@ export const register: Register = on => {
     )
     if (!isTerminal) {
       // Surfaces that draw an Svg get the picture; a short band gets it at half size. The
-      // markup follows the pose, never the tick, so her animations run on between periods.
-      // An interactive frame is what lets CSS motion and hover play; still mode is an image.
+      // markup follows the activity, pose and motion, never the tick, so her animations
+      // run on between periods. Always an image: a frame reloads, and blinks, on every new
+      // source. An image gets no :hover, so she has no hover heart for now.
       const { Svg } = $.ui.resolve(e)
       const scale = isShort ? 0.5 : 1
+      const source = pictureFor({ pose: now.pose, activity: now.activity, motion: moves })
       return (
         <Box alignItems="center">
           <Box key="cat">
-            <Svg source={drawingFor(pose, !still)} alt={altFor(pose)} width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} isInteractive={!still} />
+            <Svg source={source} alt={altFor(now.pose, now.activity)} width={DRAWING_WIDTH * scale} height={DRAWING_HEIGHT * scale} isInteractive={false} />
           </Box>
           {speech}
         </Box>
@@ -312,12 +479,12 @@ export const register: Register = on => {
     if (isShort) {
       return (
         <Box>
-          <Box key="face"><Text>{faceFor(pose, drawTick)}</Text></Box>
+          <Box key="face"><Text>{faceFor(look, drawTick)}</Text></Box>
           {speech}
         </Box>
       )
     }
-    const [row1, row2] = frameFor(pose, drawTick)
+    const [row1, row2] = frameFor(look, drawTick)
     return (
       <Box flexDirection="column">
         <Box key="row1"><Text>{row1}</Text></Box>

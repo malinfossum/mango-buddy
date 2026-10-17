@@ -1,6 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
-import type { TestBody } from 'claude-code/testing'
+import type { MockClock, TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
+import { ACTIVITY_TICKS, LINE_GAP_TICKS } from './activity'
 import { TICK_MS, SLEEP_AFTER_TICKS, RUFFLED_TICKS, PROUD_TICKS, remarkFor } from './cat'
 
 export const BAND = {
@@ -32,6 +33,8 @@ test('the desktop draws a picture of Mango and a line, no ASCII rows', async ($,
   expect(String(cat?.props.source)).toMatch(/^<svg /)
   expect(cat?.props.alt).toBe('Mango, a black cat, is awake.')
   expect(cat?.props.width).toBe(60)
+  expect(cat?.props.height).toBe(48)
+  expect(String(cat?.props.source)).toContain('<g class="act">')
   expect(await ui.find({ key: 'row1' })).toBeUndefined()
   expect(await ui.find({ key: 'line' })).toBeDefined()
 })
@@ -44,8 +47,8 @@ test('the desktop picture keeps its markup across ticks and changes with the moo
   await $.session.start(START)
   const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
   const before = await ui.find({ type: 'Svg' })
-  expect(before?.props.isInteractive).toBe(true)
-  // A changed source would reload the frame and restart her animations.
+  expect(before?.props.isInteractive).toBe(false)
+  // A changed source would restart her animations.
   await clock.advance(TICK_MS)
   await clock.advance(TICK_MS)
   expect((await ui.find({ type: 'Svg' }))?.props.source).toBe(before?.props.source)
@@ -53,6 +56,23 @@ test('the desktop picture keeps its markup across ticks and changes with the moo
   const after = await ui.find({ type: 'Svg' })
   expect(after?.props.alt).toBe('Mango, a black cat, is ruffled.')
   expect(after?.props.source).not.toBe(before?.props.source)
+})
+
+test('the desktop draws Mango as one image, with no hover', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const svgs = await ui.findAll({ type: 'Svg' })
+  expect(svgs).toHaveLength(1)
+  expect(svgs[0]?.props.isInteractive).toBe(false)
+  expect(svgs[0]?.props.width).toBe(60)
+  expect(svgs[0]?.props.height).toBe(48)
+  expect(String(svgs[0]?.props.source)).not.toContain('class="heart"')
+  // A hover Box drawn absolute shows as a popover card above the band (hover probe, 2026-10-16).
+  const boxes = await ui.findAll({ type: 'Box' })
+  expect(boxes.some(b => b.props.position === 'absolute' || b.props.hover !== undefined)).toBe(false)
 })
 
 test('an idle desktop band is not redrawn on every tick', async ($, on) => {
@@ -358,15 +378,74 @@ test('/mango mute keeps the cat and drops the speech line', async ($, on) => {
   expect(await ui.find({ key: 'line' })).toBeDefined()
 })
 
-test('/mango still and move toggle the flag', async ($, on) => {
+test('/mango still, move and auto store how she moves and redraw her', async ($, on) => {
   mock.clock(on)
   const data = memoryStore(on)
   answerStart(on)
   await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const cat = async () => (await ui.find({ type: 'Svg' }))?.props
+  expect(String((await cat())?.source)).toContain('prefers-reduced-motion:reduce')
   expect((await run($, 'still')).text).toBe('Mango sits still.')
-  expect(data.get('isStill')).toBe(true)
-  expect((await run($, 'move')).text).toBe('Mango moves again.')
-  expect(data.get('isStill')).toBe(false)
+  expect(data.get('motion')).toBe('never')
+  expect((await cat())?.isInteractive).toBe(false)
+  expect(String((await cat())?.source)).not.toContain('<style>')
+  expect((await run($, 'move')).text).toBe('Mango always moves.')
+  expect(data.get('motion')).toBe('always')
+  expect((await cat())?.isInteractive).toBe(false)
+  expect(String((await cat())?.source)).toContain('<style>')
+  expect(String((await cat())?.source)).not.toContain('prefers-reduced-motion')
+  expect((await run($, 'auto')).text).toBe('Mango follows your system.')
+  expect(data.get('motion')).toBe('auto')
+  expect(String((await cat())?.source)).toContain('prefers-reduced-motion:reduce')
+})
+
+test('an old isStill: true loads as never and is written as motion once', async ($, on) => {
+  mock.clock(on)
+  const data = memoryStore(on, { isStill: true })
+  answerStart(on)
+  await $.session.start(START)
+  expect(data.get('motion')).toBe('never')
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.isInteractive).toBe(false)
+  // Loaded as never: a still picture has no style sheet.
+  expect(String(cat?.props.source)).not.toContain('<style>')
+})
+
+test('a stored motion wins over an old isStill', async ($, on) => {
+  mock.clock(on)
+  const kept = memoryStore(on, { isStill: true, motion: 'always' })
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  expect(String((await ui.find({ type: 'Svg' }))?.props.source)).not.toContain('prefers-reduced-motion')
+  expect(kept.get('motion')).toBe('always')
+})
+
+test('junk stored settings fall back to auto, and a non-true isStill never migrates', async ($, on) => {
+  mock.clock(on)
+  const data = memoryStore(on, { motion: 'fast', isStill: 'yes' })
+  answerStart(on)
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: BAND })
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.isInteractive).toBe(false)
+  expect(String(cat?.props.source)).toContain('prefers-reduced-motion:reduce')
+  expect(data.get('motion')).toBe('fast')
+})
+
+test('a timed mood beats working on every surface', async ($, on) => {
+  mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  failBash(on)
+  await $.session.start(START)
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'tw1' })
+  const picture = await $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props: { ...BAND, isWorking: true } })
+  expect((await picture.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
+  const terminal = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: { ...BAND, isWorking: true } })
+  expect((await terminal.find({ key: 'row2' }))?.text).toContain('>.<')
 })
 
 test('stored flags load at session start, and anything but true counts as false', async ($, on) => {
@@ -389,6 +468,7 @@ test('/mango card reports stats; unknown words get help', async ($, on) => {
   await $.turn.complete(TURN)
   expect((await run($, 'card')).text).toBe('Mango · sessions 5 · pets 9 · errors survived 3 · context 12 %')
   expect((await run($, 'dance')).text).toContain('pet')
+  expect((await run($, 'dance')).text).toBe('Mango knows: pet, mute, unmute, still, move, auto, off, on, card.')
 })
 
 test('session.start counts a session once, even when it runs twice', async ($, on) => {
@@ -654,4 +734,337 @@ test('a failed clock period is skipped and the next one still ticks', async ($, 
   await clock.advance(TICK_MS * 2)
   expect(failNext).toBe(false)
   expect((await ui.find({ key: 'row2' }))?.text).toMatch(/^\( o\.o \)/)
+})
+
+// Answers every tool call beneath Mango, at once or after some clock ticks, failed or not.
+// The test's first hook on an event answers first, so a test that uses this registers no
+// other tool.call hook.
+type Answer = { ticks?: number; isError?: boolean }
+const answerTools = (on: On, clock: MockClock, answer: (e: { tool: string; command?: string }) => Answer = () => ({})) =>
+  on('tool.call', async (_$, e) => {
+    const a = answer(e)
+    if ((a.ticks ?? 0) > 0) await clock.sleep(TICK_MS * (a.ticks ?? 0))
+    return a.isError === true ? { isError: true as const, result: 'boom' } : { result: {} }
+  })
+
+const AWAKE = 'Mango, a black cat, is awake.'
+const SNIFFING = 'Mango, a black cat, sniffs around.'
+const WAITING = 'Mango, a black cat, sits and waits.'
+
+const desktop = ($: Parameters<TestBody>[0], props = BAND) => $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props })
+
+test('a Read sets her sniffing, and her mood shows again when it ends', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Read', file_path: '/home/a/x.ts', tool_use_id: 'a1' })
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(SNIFFING)
+  await clock.advance(TICK_MS * (ACTIVITY_TICKS - 2))
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(SNIFFING)
+  await clock.advance(TICK_MS)
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.alt).toBe(AWAKE)
+  expect(String(cat?.props.source)).toContain('<g class="act">')
+})
+
+// Counts writes of the activity atom, the guard against extra redraws (each one restarts her motion).
+const countActivityWrites = (on: On) => {
+  const count = { writes: 0 }
+  on('state.set', (_$, e, next) => { if (e.key === 'activity') count.writes += 1; return next(e) })
+  return count
+}
+
+test('a burst of five Reads writes the activity once', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  const count = countActivityWrites(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  await desktop($)
+  await Promise.all(['a', 'b', 'c', 'd', 'e'].map(n => $.tool.call({ tool: 'Read', file_path: `/r/${n}.ts`, tool_use_id: `b-${n}` })))
+  await clock.advance(TICK_MS * 3)
+  expect(count.writes).toBe(1)
+})
+
+test('a Read and a WebFetch before one period write the activity once, as peering', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  const count = countActivityWrites(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Read', file_path: '/r/f.ts', tool_use_id: 'p1' })
+  await $.tool.call({ tool: 'WebFetch', url: 'https://example.com/', prompt: 'p', tool_use_id: 'p2' })
+  await clock.advance(TICK_MS)
+  expect(count.writes).toBe(1)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, peers out at the web.')
+})
+
+test('TodoWrite and other tools leave her be', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  const count = countActivityWrites(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  await desktop($)
+  await $.tool.call({ tool: 'TodoWrite', todos: [], tool_use_id: 'n1' })
+  await clock.advance(TICK_MS * 2)
+  expect(count.writes).toBe(0)
+})
+
+test('a Bash call that runs twenty ticks keeps her waiting until six ticks after it ends', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, () => ({ ticks: 20.5 }))
+  await $.session.start(START)
+  const ui = await desktop($)
+  const ran = $.tool.call({ tool: 'Bash', command: 'npm run build', tool_use_id: 'w1' })
+  for (let i = 1; i <= 25; i++) {
+    await clock.advance(TICK_MS)
+    expect((await ui.find({ type: 'Svg' }))?.props.alt, `tick ${i}`).toBe(WAITING)
+  }
+  await ran
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(AWAKE)
+})
+
+test('two parallel Bash calls keep her waiting until both return', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ ticks: e.command === 'quick' ? 4.5 : 10.5 }))
+  await $.session.start(START)
+  const ui = await desktop($)
+  const quick = $.tool.call({ tool: 'Bash', command: 'quick', tool_use_id: 'w2' })
+  const slow = $.tool.call({ tool: 'Bash', command: 'slow', tool_use_id: 'w3' })
+  // Alone, the quick call would end her wait at tick 10.
+  await clock.advance(TICK_MS * 10)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(WAITING)
+  await clock.advance(TICK_MS * 5)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(WAITING)
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(AWAKE)
+  await Promise.all([quick, slow])
+})
+
+test('an Agent keeps her waiting until it returns, plus six ticks', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ ticks: e.tool === 'Agent' ? 10.5 : 0 }))
+  await $.session.start(START)
+  const ui = await desktop($)
+  const ran = $.tool.call({ tool: 'Agent', description: 'd', prompt: 'p', tool_use_id: 'g1' })
+  await clock.advance(TICK_MS * 15)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(WAITING)
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(AWAKE)
+  await ran
+})
+
+test('a long run never puts her to sleep, not even as it ends', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, () => ({ ticks: SLEEP_AFTER_TICKS + 10.5 }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  const ran = $.tool.call({ tool: 'Bash', command: 'npm run build', tool_use_id: 's1' })
+  await clock.advance(TICK_MS * (SLEEP_AFTER_TICKS + 10))
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+  await clock.advance(TICK_MS)
+  await ran
+  await clock.advance(TICK_MS * (ACTIVITY_TICKS + 1))
+  expect((await ui.find({ key: 'row2' }))?.text).not.toMatch(/z/)
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+})
+
+test('a failed Bash during an activity shows ruffled, not the activity', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ isError: e.tool === 'Bash' }))
+  await $.session.start(START)
+  const ui = await desktop($, { ...BAND, isWorking: true })
+  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'f1' })
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(SNIFFING)
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'f2' })
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
+})
+
+test('a git commit that succeeds makes her pounce; a failed one ruffles her', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ isError: e.command === 'git commit -m broken' }))
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'c1' })
+  await clock.advance(TICK_MS)
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "x"', tool_use_id: 'c2' })
+  await clock.advance(TICK_MS)
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.alt).toBe('Mango, a black cat, pounces on the commit.')
+  expect(String(cat?.props.source)).toContain('.act{animation:pounce 0.8s ease-out both}')
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m broken', tool_use_id: 'c3' })
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
+})
+
+test('a git push that succeeds sends her chasing', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Bash', command: 'git push -u origin feat', tool_use_id: 'c4' })
+  await clock.advance(TICK_MS)
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.alt).toBe('Mango, a black cat, chases the push.')
+  expect(String(cat?.props.source)).toContain('.act{animation:bounce 1.2s ease-in-out both}')
+})
+
+test('the terminal draws an activity in its own rows, and a timed mood beats it', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ isError: e.tool === 'Bash' }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  await $.tool.call({ tool: 'WebFetch', url: 'https://example.com/', prompt: 'p', tool_use_id: 't1' })
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ key: 'row2' }))?.text).toContain('( O.O ) >')
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 't2' })
+  expect((await ui.find({ key: 'row2' }))?.text).toContain('>.<')
+})
+
+test('a failed bookkeeping write never blocks a tool or leaves her waiting', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  on('state.set', (_$, e, next) => {
+    if (e.key === 'lastActivityTick') throw new Error('state down')
+    return next(e)
+  })
+  let runs = 0
+  answerTools(on, clock, () => { runs += 1; return {} })
+  await $.session.start(START)
+  const ui = await desktop($)
+  const ran = await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'k1' })
+  expect(ran.isError).toBeUndefined()
+  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'k2' })
+  expect(runs).toBe(2)
+  await clock.advance(TICK_MS * (ACTIVITY_TICKS + 1))
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(AWAKE)
+})
+
+const lineOf = async (ui: { find: (q: { key: string }) => Promise<{ text?: string } | undefined> }) => (await ui.find({ key: 'line' }))?.text ?? ''
+
+test('a Read names the file once per turn, and a new prompt lets her say it again', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  on('prompt.submit', (_$, e) => e)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Read', file_path: 'C:\\Users\\someone\\x.ts', tool_use_id: 'l1' })
+  expect(await lineOf(ui)).toBe('Mango sniffs at x.ts.')
+  await clock.advance(TICK_MS * LINE_GAP_TICKS)
+  await $.tool.call({ tool: 'Read', file_path: '/home/a/y.ts', tool_use_id: 'l2' })
+  expect(await lineOf(ui)).toContain('context 0 %')
+  await $.prompt.submit({ text: 'go', wait: false, origin: { kind: 'composer' } })
+  await $.tool.call({ tool: 'Read', file_path: '/home/a/z.ts', tool_use_id: 'l3' })
+  expect(await lineOf(ui)).toContain('z.ts')
+  expect(await lineOf(ui)).not.toContain('home')
+})
+
+test('a Grep names no pattern, and a WebFetch names only the host', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Grep', pattern: 'hunter2', tool_use_id: 'l4' })
+  expect(await lineOf(ui)).toBe('Mango sniffs around the files.')
+  await clock.advance(TICK_MS * LINE_GAP_TICKS)
+  await $.tool.call({ tool: 'WebFetch', url: 'https://user:secret@docs.example.com:8443/a?b=1', prompt: 'p', tool_use_id: 'l5' })
+  expect(await lineOf(ui)).toBe('Mango peers out at docs.example.com.')
+})
+
+test('a second line inside fourteen ticks is dropped, and the line goes when the activity ends', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'l6' })
+  await clock.advance(TICK_MS * 3)
+  await $.tool.call({ tool: 'Edit', file_path: '/r/cat.ts', old_string: 'a', new_string: 'b', tool_use_id: 'l7' })
+  expect(await lineOf(ui)).toBe('Mango sniffs at x.ts.')
+  await clock.advance(TICK_MS * (ACTIVITY_TICKS - 1))
+  expect(await lineOf(ui)).toBe('Mango sniffs at x.ts.')
+  await clock.advance(TICK_MS)
+  expect(await lineOf(ui)).toContain('context 0 %')
+})
+
+test('an activity line never replaces a purr, and its end leaves the purr', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await run($, 'pet')
+  const purr = remarkFor('purr', 0)
+  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'l8' })
+  expect(await lineOf(ui)).toBe(purr)
+  await clock.advance(TICK_MS * (ACTIVITY_TICKS + 1))
+  expect(await lineOf(ui)).toBe(purr)
+})
+
+test('a Bash run of more than forty ticks that succeeds says she kept watch; forty does not', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ ticks: e.command === 'long' ? 41.5 : 40.5 }))
+  await $.session.start(START)
+  const ui = await desktop($)
+  const short = $.tool.call({ tool: 'Bash', command: 'short', tool_use_id: 'l9' })
+  await clock.advance(TICK_MS * 41)
+  await short
+  expect(await lineOf(ui)).toContain('context 0 %')
+  const long = $.tool.call({ tool: 'Bash', command: 'long', tool_use_id: 'l10' })
+  await clock.advance(TICK_MS * 42)
+  await long
+  expect(await lineOf(ui)).toMatch(/^Mango .*\b31 s\.$/)
+})
+
+test('a successful commit or push speaks in the success colour', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "x"', tool_use_id: 'l11' })
+  expect(await lineOf(ui)).toBe('Mango pounces on the commit.')
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Text', text: 'Mango pounces on the commit.' }))?.props.color).toBe('success')
+  await clock.advance(TICK_MS * LINE_GAP_TICKS)
+  await $.tool.call({ tool: 'Bash', command: 'git push', tool_use_id: 'l12' })
+  expect(await lineOf(ui)).toMatch(/^Mango (chases|runs after) the push/)
 })

@@ -1,6 +1,8 @@
-import type { Mood } from '../types'
+import type { Activity, Mood } from '../types'
 
 export type Pose = Mood | 'working'
+// What the band draws: a pose, or an activity over it.
+export type Look = Pose | Activity
 
 export const TICK_MS = 750
 export const SLEEP_AFTER_TICKS = 160
@@ -14,8 +16,8 @@ const EARS = ' /\\_/\\'
 
 const pad = (s: string): string => (s + '          ').slice(0, ART_WIDTH)
 
-export const frameFor = (pose: Pose, tick: number): [string, string] => {
-  switch (pose) {
+export const frameFor = (look: Look, tick: number): [string, string] => {
+  switch (look) {
     case 'awake': {
       const eyes = tick % 8 === 0 ? '( -.- )' : '( o.o )'
       const tail = tick % 2 === 1 ? ' ~' : '  '
@@ -31,11 +33,24 @@ export const frameFor = (pose: Pose, tick: number): [string, string] => {
       return [pad(EARS), pad('( O.O )')]
     case 'working':
       return [pad(EARS), pad(tick % 2 === 0 ? '( o.o )nn' : '( o.o ) nn')]
+    case 'sniffing':
+      return [pad(EARS), pad(tick % 2 === 0 ? '( o.o )..' : '( o.o ).')]
+    case 'watching':
+      // Her eyes follow the edit from side to side, two ticks each way.
+      return [pad(EARS), pad(tick % 4 < 2 ? '(o.o  )' : '(  o.o)')]
+    case 'peering':
+      return [pad(EARS), pad('( O.O ) >')]
+    case 'waiting':
+      return [pad(EARS), pad(tick % 2 === 0 ? '( -.- ) ~' : '( -.- ) .')]
+    case 'pouncing':
+      return [pad(EARS), pad('( ^o^ ) /')]
+    case 'chasing':
+      return [pad(EARS), pad('( >o< )==')]
   }
 }
 
-export const faceFor = (pose: Pose, tick: number): string => {
-  switch (pose) {
+export const faceFor = (look: Look, tick: number): string => {
+  switch (look) {
     case 'awake':
       return tick % 8 === 0 ? '(-.-)' : '(o.o)'
     case 'sleeping':
@@ -48,14 +63,27 @@ export const faceFor = (pose: Pose, tick: number): string => {
       return '(O.O)'
     case 'working':
       return '(o.o)'
+    case 'sniffing':
+    case 'watching':
+      return '(o.o)'
+    case 'peering':
+      return '(O.O)'
+    case 'waiting':
+      return '(-.-)'
+    case 'pouncing':
+      return '(^o^)'
+    case 'chasing':
+      return '(>o<)'
   }
 }
 
-// The theme colour a remark is drawn in, by the pose Mango shows. Theme keys follow the
+// The theme colour a remark is drawn in, by the look Mango shows. Theme keys follow the
 // person's theme, so these stay readable in light and dark.
-export const toneFor = (pose: Pose): string => {
-  switch (pose) {
+export const toneFor = (look: Look): string => {
+  switch (look) {
     case 'proud':
+    case 'pouncing':
+    case 'chasing':
       return 'success'
     case 'ruffled':
       return 'error'
@@ -65,6 +93,10 @@ export const toneFor = (pose: Pose): string => {
       return 'suggestion'
     case 'awake':
     case 'working':
+    case 'sniffing':
+    case 'watching':
+    case 'peering':
+    case 'waiting':
       return 'claude'
   }
 }
