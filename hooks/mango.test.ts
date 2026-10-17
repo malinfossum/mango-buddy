@@ -1,6 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
-import type { TestBody } from 'claude-code/testing'
+import type { MockClock, TestBody } from 'claude-code/testing'
 import type { On } from 'claude-code'
+import { ACTIVITY_TICKS } from './activity'
 import { TICK_MS, SLEEP_AFTER_TICKS, RUFFLED_TICKS, PROUD_TICKS, remarkFor } from './cat'
 
 export const BAND = {
@@ -733,4 +734,237 @@ test('a failed clock period is skipped and the next one still ticks', async ($, 
   await clock.advance(TICK_MS * 2)
   expect(failNext).toBe(false)
   expect((await ui.find({ key: 'row2' }))?.text).toMatch(/^\( o\.o \)/)
+})
+
+// Answers every tool call beneath Mango, at once or after some clock ticks, failed or not.
+// The test's first hook on an event answers first, so a test that uses this registers no
+// other tool.call hook.
+type Answer = { ticks?: number; isError?: boolean }
+const answerTools = (on: On, clock: MockClock, answer: (e: { tool: string; command?: string }) => Answer = () => ({})) =>
+  on('tool.call', async (_$, e) => {
+    const a = answer(e)
+    if ((a.ticks ?? 0) > 0) await clock.sleep(TICK_MS * (a.ticks ?? 0))
+    return a.isError === true ? { isError: true as const, result: 'boom' } : { result: {} }
+  })
+
+const AWAKE = 'Mango, a black cat, is awake.'
+const SNIFFING = 'Mango, a black cat, sniffs around.'
+const WAITING = 'Mango, a black cat, sits and waits.'
+
+const desktop = ($: Parameters<TestBody>[0], props = BAND) => $.ui.mount({ plugin: 'mango', surface: 'desktop', component: 'AbovePrompt', props })
+
+test('a Read sets her sniffing, and her mood shows again when it ends', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Read', file_path: '/home/a/x.ts', tool_use_id: 'a1' })
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(SNIFFING)
+  await clock.advance(TICK_MS * (ACTIVITY_TICKS - 2))
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(SNIFFING)
+  await clock.advance(TICK_MS)
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.alt).toBe(AWAKE)
+  expect(String(cat?.props.source)).toContain('<g class="act">')
+})
+
+// Counts writes of the activity atom, the guard against extra redraws (each one restarts her motion).
+const countActivityWrites = (on: On) => {
+  const count = { writes: 0 }
+  on('state.set', (_$, e, next) => { if (e.key === 'activity') count.writes += 1; return next(e) })
+  return count
+}
+
+test('a burst of five Reads writes the activity once', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  const count = countActivityWrites(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  await desktop($)
+  await Promise.all(['a', 'b', 'c', 'd', 'e'].map(n => $.tool.call({ tool: 'Read', file_path: `/r/${n}.ts`, tool_use_id: `b-${n}` })))
+  await clock.advance(TICK_MS * 3)
+  expect(count.writes).toBe(1)
+})
+
+test('a Read and a WebFetch before one period write the activity once, as peering', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  const count = countActivityWrites(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Read', file_path: '/r/f.ts', tool_use_id: 'p1' })
+  await $.tool.call({ tool: 'WebFetch', url: 'https://example.com/', prompt: 'p', tool_use_id: 'p2' })
+  await clock.advance(TICK_MS)
+  expect(count.writes).toBe(1)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, peers out at the web.')
+})
+
+test('TodoWrite and other tools leave her be', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  const count = countActivityWrites(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  await desktop($)
+  await $.tool.call({ tool: 'TodoWrite', todos: [], tool_use_id: 'n1' })
+  await clock.advance(TICK_MS * 2)
+  expect(count.writes).toBe(0)
+})
+
+test('a Bash call that runs twenty ticks keeps her waiting until six ticks after it ends', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, () => ({ ticks: 20.5 }))
+  await $.session.start(START)
+  const ui = await desktop($)
+  const ran = $.tool.call({ tool: 'Bash', command: 'npm run build', tool_use_id: 'w1' })
+  for (let i = 1; i <= 25; i++) {
+    await clock.advance(TICK_MS)
+    expect((await ui.find({ type: 'Svg' }))?.props.alt, `tick ${i}`).toBe(WAITING)
+  }
+  await ran
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(AWAKE)
+})
+
+test('two parallel Bash calls keep her waiting until both return', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ ticks: e.command === 'quick' ? 4.5 : 10.5 }))
+  await $.session.start(START)
+  const ui = await desktop($)
+  const quick = $.tool.call({ tool: 'Bash', command: 'quick', tool_use_id: 'w2' })
+  const slow = $.tool.call({ tool: 'Bash', command: 'slow', tool_use_id: 'w3' })
+  // Alone, the quick call would end her wait at tick 10.
+  await clock.advance(TICK_MS * 10)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(WAITING)
+  await clock.advance(TICK_MS * 5)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(WAITING)
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(AWAKE)
+  await Promise.all([quick, slow])
+})
+
+test('an Agent keeps her waiting until it returns, plus six ticks', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ ticks: e.tool === 'Agent' ? 10.5 : 0 }))
+  await $.session.start(START)
+  const ui = await desktop($)
+  const ran = $.tool.call({ tool: 'Agent', description: 'd', prompt: 'p', tool_use_id: 'g1' })
+  await clock.advance(TICK_MS * 15)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(WAITING)
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(AWAKE)
+  await ran
+})
+
+test('a long run never puts her to sleep, not even as it ends', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, () => ({ ticks: SLEEP_AFTER_TICKS + 10.5 }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  const ran = $.tool.call({ tool: 'Bash', command: 'npm run build', tool_use_id: 's1' })
+  await clock.advance(TICK_MS * (SLEEP_AFTER_TICKS + 10))
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+  await clock.advance(TICK_MS)
+  await ran
+  await clock.advance(TICK_MS * (ACTIVITY_TICKS + 1))
+  expect((await ui.find({ key: 'row2' }))?.text).not.toMatch(/z/)
+  expect((await ui.find({ key: 'line' }))?.text).toContain('context 0 %')
+})
+
+test('a failed Bash during an activity shows ruffled, not the activity', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ isError: e.tool === 'Bash' }))
+  await $.session.start(START)
+  const ui = await desktop($, { ...BAND, isWorking: true })
+  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'f1' })
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(SNIFFING)
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'f2' })
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
+})
+
+test('a git commit that succeeds makes her pounce; a failed one ruffles her', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ isError: e.command === 'git commit -m broken' }))
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'c1' })
+  await clock.advance(TICK_MS)
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m "x"', tool_use_id: 'c2' })
+  await clock.advance(TICK_MS)
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.alt).toBe('Mango, a black cat, pounces on the commit.')
+  expect(String(cat?.props.source)).toContain('.act{animation:pounce 0.8s ease-out both}')
+  await $.tool.call({ tool: 'Bash', command: 'git commit -m broken', tool_use_id: 'c3' })
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe('Mango, a black cat, is ruffled.')
+})
+
+test('a git push that succeeds sends her chasing', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock)
+  await $.session.start(START)
+  const ui = await desktop($)
+  await $.tool.call({ tool: 'Bash', command: 'git push -u origin feat', tool_use_id: 'c4' })
+  await clock.advance(TICK_MS)
+  const cat = await ui.find({ type: 'Svg' })
+  expect(cat?.props.alt).toBe('Mango, a black cat, chases the push.')
+  expect(String(cat?.props.source)).toContain('.act{animation:bounce 1.2s ease-in-out both}')
+})
+
+test('the terminal draws an activity in its own rows, and a timed mood beats it', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  answerTools(on, clock, e => ({ isError: e.tool === 'Bash' }))
+  await $.session.start(START)
+  const ui = await $.ui.mount({ plugin: 'mango', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  await $.tool.call({ tool: 'WebFetch', url: 'https://example.com/', prompt: 'p', tool_use_id: 't1' })
+  await clock.advance(TICK_MS)
+  expect((await ui.find({ key: 'row2' }))?.text).toContain('( O.O ) >')
+  await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 't2' })
+  expect((await ui.find({ key: 'row2' }))?.text).toContain('>.<')
+})
+
+test('a failed bookkeeping write never blocks a tool or leaves her waiting', async ($, on) => {
+  const clock = mock.clock(on)
+  memoryStore(on)
+  answerStart(on)
+  on('state.set', (_$, e, next) => {
+    if (e.key === 'lastActivityTick') throw new Error('state down')
+    return next(e)
+  })
+  let runs = 0
+  answerTools(on, clock, () => { runs += 1; return {} })
+  await $.session.start(START)
+  const ui = await desktop($)
+  const ran = await $.tool.call({ tool: 'Bash', command: 'ls', tool_use_id: 'k1' })
+  expect(ran.isError).toBeUndefined()
+  await $.tool.call({ tool: 'Read', file_path: '/r/x.ts', tool_use_id: 'k2' })
+  expect(runs).toBe(2)
+  await clock.advance(TICK_MS * (ACTIVITY_TICKS + 1))
+  expect((await ui.find({ type: 'Svg' }))?.props.alt).toBe(AWAKE)
 })

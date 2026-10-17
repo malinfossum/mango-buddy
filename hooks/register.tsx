@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 import type { Activity, Mood, Motion } from '../types'
-import { showing } from './activity'
+import { ACTIVITY_TICKS, activityFor, gitStepOf, showing } from './activity'
 import { ART_WIDTH, BUDGET_PERCENT, faceFor, frameFor, GAP, isTestCommand, PROUD_TICKS, remarkFor, resolveMood, RUFFLED_TICKS, TICK_MS, toneFor } from './cat'
 import { altFor, DRAWING_HEIGHT, DRAWING_WIDTH } from './drawing'
 import { pictureFor } from './stage'
@@ -48,6 +48,41 @@ let sleepRemark: string | null = null
 // The mood the clock saw on its previous period, to spot the move into sleeping.
 let lastMood: Mood = 'awake'
 
+// The activity the picture shows (the last one written) and the one the next clock period
+// writes. Tool calls set only the pending one, so a burst of them costs one redraw.
+let shownActivity: Activity | null = null
+let pendingActivity: Activity | null = null
+
+// The clock tick the activity ends on, unless a Bash or Agent call still runs.
+let activityUntil = 0
+let runningWaits = 0
+
+// Sets what she does next and restarts its timer. The clock writes it. The same activity
+// writes nothing, so a burst of Reads, or a second commit that returns within one clock
+// period, draws nothing new and never restarts her motion.
+const setActivity = (a: Activity) => {
+  pendingActivity = a
+  activityUntil = clockTick + ACTIVITY_TICKS
+}
+
+// Bookkeeping around a tool call never blocks it: a failed read or write is dropped.
+const quietly = async (work: () => Promise<unknown>): Promise<void> => {
+  try {
+    await work()
+  } catch {
+    // the call goes on
+  }
+}
+
+// Writes the pending activity once, and only when it differs from the one showing. A
+// failed write is tried again on the next period.
+const writeActivity = async ($: EngineType) => {
+  const a = pendingActivity
+  if (a === shownActivity) return
+  await update($, activity, () => a)
+  shownActivity = a
+}
+
 const snapshot = async ($: EngineType, t: number) => ({
   mood: await read($, mood),
   moodUntil: await read($, moodUntil),
@@ -77,6 +112,22 @@ export const markActivity = async ($: EngineType) => {
   await update($, lastActivityTick, () => t)
   await clearSleepRemark($)
   await syncShownMood($)
+}
+
+// Runs a Bash or Agent call while she waits for it. The count keeps the activity from
+// ending while any such call runs, and each return restarts the timer. The count is
+// raised and lowered around nothing but the call, so it always comes back down.
+const whileWaiting = async <T,>($: EngineType, run: () => Promise<T>): Promise<T> => {
+  runningWaits += 1
+  try {
+    setActivity('waiting')
+    return await run()
+  } finally {
+    runningWaits -= 1
+    activityUntil = clockTick + ACTIVITY_TICKS
+    // A long run must not leave her asleep the moment it ends.
+    await quietly(() => markActivity($))
+  }
 }
 
 // Reads the count, adds one and writes it back at the moment of change.
@@ -152,6 +203,8 @@ const advanceClock = async ($: EngineType) => {
   clockTick += 1
   const t = clockTick
   let s = await snapshot($, t)
+  // While a Bash or Agent call runs she is busy waiting, so she does not fall asleep.
+  if (runningWaits > 0) s = { ...s, lastActivityTick: t }
   if ((s.mood === 'ruffled' || s.mood === 'proud') && t >= s.moodUntil) {
     // The timed mood is over: fall back to awake and drop its remark, once.
     await update($, mood, () => 'awake')
@@ -177,6 +230,10 @@ const advanceClock = async ($: EngineType) => {
     await clearSleepRemark($)
   }
   lastMood = now
+  if (runningWaits === 0 && t >= activityUntil && pendingActivity !== null) {
+    pendingActivity = null
+  }
+  await writeActivity($)
 }
 
 // Reads the context figure the way turn.complete does. Undefined when usage has no figure.
@@ -207,6 +264,11 @@ export const register: Register = on => {
       name: 'mango',
       description: 'Pet Mango, or tell her to be still, quiet or away.',
       argumentHint: 'pet | mute | unmute | still | move | auto | off | on | card',
+    })
+    // A repeated session.start picks up the activity the picture already shows.
+    await quietly(async () => {
+      shownActivity = await read($, activity)
+      pendingActivity = shownActivity
     })
 
     const storedOff = flag(await $.store.get('isOff'))
@@ -240,17 +302,37 @@ export const register: Register = on => {
   on('command.run', { command: 'mango' }, async ($, e) => ({ text: await runCommand($, e.args) }))
     .catch(() => ({ text: 'Mango could not do that.' }))
 
+  // Reading, editing and the web: she sniffs, watches or peers.
+  on('tool.call', { tool: ['Read', 'Grep', 'Glob', 'Edit', 'Write', 'WebFetch', 'WebSearch'] }, async ($, e, next) => {
+    const a = activityFor(e.tool)
+    if (a !== null) setActivity(a)
+    await quietly(() => markActivity($))
+    return next(e)
+  }).catch(($, e, next) => next(e))
+
+  on('tool.call', { tool: 'Agent' }, async ($, e, next) =>
+    whileWaiting($, async () => {
+      await quietly(() => markActivity($))
+      return next(e)
+    }),
+  ).catch(($, e, next) => next(e))
+
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
-    await markActivity($)
     const isTest = isTestCommand(e.command)
-    const ran = await next(e)
+    const step = gitStepOf(e.command)
+    const ran = await whileWaiting($, async () => {
+      await quietly(() => markActivity($))
+      return next(e)
+    })
     if (ran.deny !== undefined) return ran
     if (ran.isError === true) {
       await setTimedMood($, 'ruffled', RUFFLED_TICKS)
       await bump($, 'errorsSurvived')
-    } else if (isTest) {
-      await setTimedMood($, 'proud', PROUD_TICKS)
+      return ran
     }
+    if (isTest) await setTimedMood($, 'proud', PROUD_TICKS)
+    // A commit or push that went through: she pounces on it, or chases it out.
+    if (step !== null) setActivity(step === 'push' ? 'chasing' : 'pouncing')
     return ran
   }).catch(($, e, next) => next(e))
 
