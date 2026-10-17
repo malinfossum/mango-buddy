@@ -15,6 +15,8 @@
 
 Mango sits in the little band above the prompt and keeps you company while you work. She blinks, flicks her tail and kneads while Claude thinks. She naps when you go quiet, flattens her ears at a failed command, purrs at a green test run and gets a little worried when your context window fills up.
 
+She follows along while Claude works, too. She sniffs at the files it reads, watches it edit, peers out when it goes to the web and waits with you through a long build. She pounces on a commit and chases a push out the door.
+
 <p align="center">
   <img src="assets/bands.svg" alt="Mango in the band above the prompt, twice. In the desktop Code tab she is a little drawing of a black cat with a sparkle, saying: Mango purrs at the green run. In the terminal she is an ASCII cat with flattened ears, saying: Mango knocks the error off the table." width="100%">
 </p>
@@ -52,7 +54,9 @@ Say `y` to add the marketplace, then pick **user** scope so she follows you into
 | `/mango` or `/mango pet` | You pet her. She purrs. |
 | `/mango card` | Your story together: sessions, pets, errors survived, context |
 | `/mango mute` / `unmute` | She stays, but keeps her thoughts to herself |
-| `/mango still` / `move` | She sits perfectly still (calmer for screen readers and reduced motion) |
+| `/mango still` | She sits still without moving (calmer for screen readers) |
+| `/mango move` | She always moves, even when your system asks for reduced motion |
+| `/mango auto` | She follows your system's reduced-motion setting (the default) |
 | `/mango off` / `on` | She hides, or comes back. She remembers this between sessions. |
 
 <br>
@@ -60,8 +64,9 @@ Say `y` to add the marketplace, then pick **user** scope so she follows you into
 ## <img src="assets/icons/leaf.svg" width="22" height="22" alt=""> Gentle by design
 
 - **She never phones home.** No network, no model calls, no telemetry, no dependencies.
+- **She only glances at names.** She may say the name of a file Claude reads or edits, or the site it visits, and nothing more: never a folder, a search, a command or its output. `/mango mute` keeps her quiet.
 - **She dresses for the room.** In the terminal she is plain ASCII, so she fits any terminal. In the desktop Code tab she is a little drawing of the real Mango.
-- **She is alive on desktop.** She breathes, blinks, twitches an ear and swishes her tail, and each mood moves in its own way. Rest your pointer on her and she perks up. She holds still when your system asks for reduced motion.
+- **She is alive on desktop.** She breathes, blinks, twitches an ear and swishes her tail, and each mood moves in its own way. She holds still when your system asks for reduced motion, unless you tell her `/mango move`.
 - **She speaks in your colours.** Her remarks use your theme's colours, so they stay readable in light and dark.
 - **She makes room.** On a narrow or short band she curls up into a single line.
 - **She works everywhere.** The terminal and the desktop Code tab alike.
