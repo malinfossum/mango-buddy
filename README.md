@@ -15,8 +15,6 @@
 
 Mango sits in the little band above the prompt and keeps you company while you work. She blinks, flicks her tail and kneads while Claude thinks. She naps when you go quiet, flattens her ears at a failed command, purrs at a green test run and gets a little worried when your context window fills up.
 
-She follows along while Claude works, too. She sniffs at the files it reads, watches it edit, peers out when it goes to the web and waits with you through a long build. She pounces on a commit and chases a push out the door.
-
 <p align="center">
   <img src="assets/bands.svg" alt="Mango in the band above the prompt, twice. In the desktop Code tab she is a little drawing of a black cat with a sparkle, saying: Mango purrs at the green run. In the terminal she is an ASCII cat with flattened ears, saying: Mango knocks the error off the table." width="100%">
 </p>
@@ -32,6 +30,18 @@ She is small, she is soft, and she is always there.
 </p>
 
 Every mood comes with something to say, like *"Mango knocks the error off the table."* or *"Mango dreams of warm laptops."* Pet her and she leans into your hand.
+
+<br>
+
+## <img src="assets/icons/eye.svg" width="22" height="22" alt=""> While Claude works
+
+She keeps up with Claude, too. She sniffs at the files it reads, watches it edit, peers out when it goes to the web and waits with you through a long build. She pounces on a commit and chases a push out the door.
+
+<p align="center">
+  <img src="assets/activities.svg" alt="Six activity cards, each with her terminal face and her desktop drawing. Sniffing: at files Claude reads. Watching: as Claude edits a file. Peering: out at the web. Waiting: while a command runs. Pouncing: on a fresh commit. Chasing: a push out the door." width="100%">
+</p>
+
+Now and then she says what she sees, like *"Mango sniffs at cat.ts."* or *"Mango pounces on the commit."*
 
 <br>
 
